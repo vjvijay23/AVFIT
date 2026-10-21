@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "AVFIT",
+    "slug": "avfit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fitpulse.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "FitPulse uses your camera to scan food dishes and calculate accurate nutritional macros.",
+        "NSPhotoLibraryUsageDescription": "FitPulse allows you to pick food photos and workout progress photos from your library.",
+        "NSMotionUsageDescription": "FitPulse tracks your daily steps and distance in the background."
+      }
+    },
+    "android": {
+      "package": "com.fitpulse.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "extra": {
+      "supabaseUrl": "https://your-supabase-project.supabase.co",
+      "supabaseAnonKey": "your-supabase-anon-key",
+      "geminiApiKey": "your-gemini-api-key"
+    }
+  }
+}

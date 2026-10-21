@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AVFIT - Mobile Device Emulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Mobile scrollbar */
+    ::-webkit-scrollbar { width: 0px; height: 0px; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background-color: #F9F6F0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+  </style>
+</head>
+<body class="flex flex-col h-full bg-[#F9F6F0] text-[#191C1A]">
+
+  <!-- Mobile Status Bar -->
+  <div class="px-6 pt-3 pb-2 flex justify-between items-center text-[12px] font-bold text-[#191C1A] select-none bg-[#F9F6F0] z-30 shrink-0">
+    <span>9:41</span>
+    <!-- Dynamic Island / Speaker Pill -->
+    <div class="w-24 h-4 bg-[#161A17] rounded-full mx-auto"></div>
+    <div class="flex items-center gap-1.5 font-mono text-[11px]">
+      <span>5G</span>
+      <span class="w-5 h-2.5 border border-[#191C1A] rounded-sm p-[1px] flex items-center">
+        <span class="bg-[#191C1A] w-full h-full rounded-[1px]"></span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Scrollable Screen Content Viewport -->
+  <main id="mobile-viewport" class="flex-1 overflow-y-auto px-4 py-2 pb-24 space-y-4">
+    
+    <!-- ==================== SCREEN 1: HOME & ACTIVE STATS ==================== -->
+    <div id="screen-dashboard" class="screen-view space-y-3.5">
+      <!-- Top Row with AVFIT Brand Logo Lockup -->
+      <div class="flex justify-between items-center pt-1">
+        <div class="w-11 h-11 rounded-full bg-[#F3EDE2] border-2 border-white shadow-sm flex items-center justify-center text-xl">
+          🏃‍♀️
+        </div>
+        <!-- Official AVFIT Logo in Header -->
+        <div class="flex items-center gap-2 bg-white border border-[#E8DFC8] px-3.5 py-1.5 rounded-full shadow-sm">
+          <img src="../assets/avfit_official_logo.png" alt="AVFIT Logo" class="w-6 h-6 rounded-[7px] object-cover shadow-sm" />
+          <span class="text-xs font-black tracking-wider text-[#191C1A]">AV<span class="text-[#00A6FF]">FIT</span></span>
+        </div>
+        <div class="w-11 h-11 rounded-full bg-white border border-[#E8DFC8] flex items-center justify-center text-[#244A32] font-black shadow-sm cursor-pointer hover:bg-[#F3EDE2]" onclick="switchTab('scanner')">
+          ⚡
+        </div>
+      </div>
+
+      <!-- Greeting & Streak -->
+      <div class="flex justify-between items-start pt-1">
+        <div>
+          <h1 class="text-2xl font-black text-[#191C1A] tracking-tight">Hey, Michelle</h1>
+          <p class="text-xs text-[#6B726C] mt-0.5">Welcome, 11-week. Keep keep going!</p>
+        </div>
+        <div class="flex items-center gap-1.5 bg-white border border-[#F3E5D8] px-3.5 py-1.5 rounded-full shadow-sm text-xs font-black text-[#191C1A]">
+          <span class="text-[#EB7142]">🔥</span>
+          <span>11</span>
+        </div>
+      </div>
+
+      <!-- Botanical Runner Graphic Card -->
+      <div class="relative bg-[#F3EDE2] border border-[#E8DFC8] rounded-[28px] h-48 overflow-hidden flex items-center justify-center shadow-inner">
+        <div class="absolute -left-2 top-2 text-3xl opacity-80">🌿</div>
+        <div class="absolute -right-2 bottom-2 text-3xl opacity-80">🍃</div>
+        <div class="text-center z-10">
+          <div class="w-20 h-20 rounded-full bg-white/80 mx-auto flex items-center justify-center text-4xl shadow-sm mb-1.5">
+            🏃‍♀️
+          </div>
+          <div class="bg-white/95 px-3.5 py-1 rounded-full text-[10px] font-black text-[#244A32] shadow-sm">
+            ⚡ Morning Run Goal 85%
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Stats Card (Screen 1 from Reference) -->
+      <div class="bg-[#F7F2EA] border border-[#EAE1D2] rounded-[26px] p-4 shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-[#244A32] font-black">⚡</span>
+            <span class="text-sm font-black text-[#191C1A]">Active Stats</span>
+          </div>
+          <button onclick="switchTab('activity')" class="w-6 h-6 rounded-full bg-white border border-[#E2D8C6] flex items-center justify-center text-xs font-bold text-[#244A32] hover:bg-[#F3EDE2]">
+            +
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <!-- Left Metric: 450 kcal Duration -->
+          <div class="flex-1">
+            <div class="flex items-baseline gap-1">
+              <span class="text-3xl font-black text-[#191C1A] tracking-tight">450</span>
+              <span class="text-xs font-bold text-[#191C1A]">kcal</span>
+            </div>
+            <span class="text-xs text-[#6B726C] font-semibold">Duration</span>
+          </div>
+
+          <!-- Divider -->
+          <div class="w-[1px] h-10 bg-[#DFD5C2] mx-4"></div>
+
+          <!-- Right Metric: 72 min Workouts -->
+          <div class="flex-1">
+            <div class="flex items-baseline gap-1">
+              <span class="text-3xl font-black text-[#191C1A] tracking-tight">72</span>
+              <span class="text-xs font-bold text-[#191C1A]">min</span>
+            </div>
+            <span class="text-xs text-[#6B726C] font-semibold">Workouts</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Routine Card -->
+      <div class="bg-white border border-[#E8DFC8] rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-[#E8F1EC] flex items-center justify-center text-base font-bold text-[#244A32]">
+            🧘‍♀️
+          </div>
+          <div>
+            <h4 class="text-xs font-black text-[#191C1A]">Performing Stretch</h4>
+            <p class="text-[10px] text-[#6B726C]">20-30 min per day • Mobility</p>
+          </div>
+        </div>
+        <button onclick="switchTab('workouts')" class="px-3.5 py-1.5 bg-[#244A32] text-white text-xs font-bold rounded-xl hover:bg-[#1b3826] transition shadow-sm">
+          Start ▶
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN 2: ACTIVITY SUMMARY ==================== -->
+    <div id="screen-activity" class="screen-view space-y-3.5 hidden">
+      <!-- Top Row -->
+      <div class="flex justify-between items-center pt-1">
+        <div class="w-11 h-11 rounded-full bg-[#F3EDE2] border-2 border-white shadow-sm flex items-center justify-center text-xl">
+          🏃‍♀️
+        </div>
+        <div class="flex items-center gap-2 bg-white border border-[#E8DFC8] px-3.5 py-1.5 rounded-full shadow-sm">
+          <img src="../assets/avfit_official_logo.png" alt="AVFIT Logo" class="w-6 h-6 rounded-[7px] object-cover shadow-sm" />
+          <span class="text-xs font-black tracking-wider text-[#191C1A]">AV<span class="text-[#00A6FF]">FIT</span></span>
+        </div>
+        <div class="w-11 h-11 rounded-full bg-white border border-[#E8DFC8] flex items-center justify-center text-[#244A32] font-black shadow-sm">
+          ⚡
+        </div>
+      </div>
+
+      <h2 class="text-xl font-black text-[#191C1A] tracking-tight">Activity Summary</h2>
+
+      <!-- Walking Steps Bar Chart (Screen 2 from Reference) -->
+      <div class="bg-white border border-[#E8DFC8] rounded-[26px] p-4 shadow-sm">
+        <div class="flex justify-between items-center mb-4">
+          <div class="flex items-center gap-2">
+            <span class="text-[#244A32] font-bold">👟</span>
+            <span class="text-sm font-black text-[#191C1A]">Walking steps</span>
+          </div>
+          <span class="text-[11px] font-bold bg-[#F3EDE2] text-[#6B726C] px-3 py-1 rounded-full">Week</span>
+        </div>
+
+        <!-- Vertical Bar Chart -->
+        <div class="flex items-end justify-between h-40 pt-6 px-1">
+          <!-- Sun -->
+          <div class="flex flex-col items-center gap-1.5 w-11">
+            <div class="w-10 bg-[#244A32] rounded-2xl h-24 flex flex-col justify-end items-center pb-1.5">
+              <span class="text-[7px] text-white/90 font-bold">8,328</span>
+            </div>
+            <span class="text-[11px] font-semibold text-[#6B726C]">Sun</span>
+          </div>
+
+          <!-- Mon -->
+          <div class="flex flex-col items-center gap-1.5 w-11">
+            <div class="w-10 bg-[#244A32] rounded-2xl h-32 flex flex-col justify-end items-center pb-1.5">
+              <span class="text-[7px] text-white/90 font-bold">10,032</span>
+            </div>
+            <span class="text-[11px] font-semibold text-[#6B726C]">Mon</span>
+          </div>
+
+          <!-- Tue -->
+          <div class="flex flex-col items-center gap-1.5 w-11">
+            <div class="w-10 bg-[#244A32] rounded-2xl h-22 flex flex-col justify-end items-center pb-1.5">
+              <span class="text-[7px] text-white/90 font-bold">8,211</span>
+            </div>
+            <span class="text-[11px] font-semibold text-[#6B726C]">Tue</span>
+          </div>
+
+          <!-- Wed (Highlighted) -->
+          <div class="flex flex-col items-center gap-1.5 w-11 relative">
+            <div class="absolute -top-6 bg-[#161A17] text-white px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-sm">
+              <span>👟</span><span>7,427</span>
+            </div>
+            <div class="w-10 bg-[#EB7142] border border-[#F9D1BF] rounded-2xl h-28 shadow-sm"></div>
+            <span class="text-[11px] font-extrabold text-[#191C1A]">Wed</span>
+          </div>
+
+          <!-- Thr -->
+          <div class="flex flex-col items-center gap-1.5 w-11">
+            <div class="w-10 bg-[#F3EDE2] rounded-2xl h-28"></div>
+            <span class="text-[11px] font-semibold text-[#6B726C]">Thr</span>
+          </div>
+
+          <!-- Fri -->
+          <div class="flex flex-col items-center gap-1.5 w-11">
+            <div class="w-10 bg-[#F3EDE2] rounded-2xl h-28"></div>
+            <span class="text-[11px] font-semibold text-[#6B726C]">Fri</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sets & Heart Rate Cards -->
+      <div class="grid grid-cols-2 gap-3">
+        <!-- Sets Card -->
+        <div class="bg-white border border-[#E8DFC8] rounded-[24px] p-3.5 shadow-sm">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-7 h-7 rounded-lg bg-[#E8F1EC] flex items-center justify-center text-xs text-[#244A32]">
+              🏋️
+            </div>
+            <span class="text-xs font-extrabold text-[#191C1A]">Sets</span>
+          </div>
+          <div class="flex items-baseline gap-0.5">
+            <span class="text-2xl font-black text-[#191C1A]">7,3</span>
+            <span class="text-sm font-bold text-[#191C1A]">k</span>
+          </div>
+          <span class="text-[10px] text-[#6B726C] block mb-2.5">Duration</span>
+          <div class="flex items-center gap-1">
+            <span class="text-[9px] font-bold bg-[#E8F1EC] text-[#244A32] px-2 py-0.5 rounded-lg border border-[#C5DDCF]">Run</span>
+            <span class="text-[9px] font-bold bg-[#F3EDE2] text-[#6B726C] px-2 py-0.5 rounded-lg">Gym</span>
+            <span class="text-[9px] font-bold bg-[#F3EDE2] text-[#6B726C] px-2 py-0.5 rounded-lg">+</span>
+          </div>
+        </div>
+
+        <!-- Heart Rate Card -->
+        <div class="bg-white border border-[#E8DFC8] rounded-[24px] p-3.5 shadow-sm">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-7 h-7 rounded-lg bg-[#FDF1EC] flex items-center justify-center text-xs text-[#EB7142]">
+              ⌚
+            </div>
+            <span class="text-xs font-extrabold text-[#191C1A]">Heart rate</span>
+          </div>
+          <div class="flex items-baseline gap-1">
+            <span class="text-2xl font-black text-[#191C1A]">139</span>
+            <span class="text-[10px] font-bold text-[#6B726C]">bpm</span>
+          </div>
+          <span class="text-[10px] text-[#6B726C] block mb-2">Min • 128-162</span>
+          <div class="bg-[#F7F2EA] px-2 py-1 rounded-lg text-[9px] font-semibold text-[#6B726C] truncate">
+            ⌚ Apple Watch Synced
+          </div>
+        </div>
+      </div>
+
+      <!-- Today's Goals (Screen 2 from Reference) -->
+      <div class="bg-white border border-[#E8DFC8] rounded-[24px] p-3.5 shadow-sm">
+        <div class="flex justify-between items-center mb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-[#244A32] text-sm font-bold">🏆</span>
+            <span class="text-xs font-black text-[#191C1A]">Today's Goals</span>
+          </div>
+          <span class="w-6 h-6 rounded-full bg-[#F3EDE2] flex items-center justify-center text-xs font-bold text-[#244A32]">+</span>
+        </div>
+        <div class="bg-[#FAF8F4] p-2.5 rounded-xl flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-[#E8F1EC] flex items-center justify-center text-xs text-[#244A32]">💪</div>
+            <div>
+              <span class="text-xs font-extrabold text-[#191C1A] block">Gym Workout</span>
+              <span class="text-[10px] text-[#6B726C]">Core & HIIT Complete</span>
+            </div>
+          </div>
+          <span class="text-[10px] font-extrabold bg-[#E8F1EC] text-[#244A32] px-2 py-0.5 rounded-md">Complete</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN 3: HEART HEALTH & RECOVERY ==================== -->
+    <div id="screen-workouts" class="screen-view space-y-3.5 hidden">
+      <!-- Top Row -->
+      <div class="flex justify-between items-center pt-1">
+        <button onclick="switchTab('dashboard')" class="w-11 h-11 rounded-full bg-white border border-[#E8DFC8] flex items-center justify-center text-[#191C1A] font-bold shadow-sm">
+          ❮
+        </button>
+        <div class="bg-[#F3EDE2] p-1 rounded-full flex items-center gap-1">
+          <button id="toggle-day" onclick="setHealthPeriod('day')" class="px-3.5 py-1 rounded-full text-xs font-bold bg-[#244A32] text-white shadow-sm transition">
+            Day
+          </button>
+          <button id="toggle-week" onclick="setHealthPeriod('week')" class="px-3.5 py-1 rounded-full text-xs font-medium text-[#6B726C] hover:text-[#191C1A] transition">
+            Week
+          </button>
+        </div>
+      </div>
+
+      <h2 class="text-xl font-black text-[#191C1A] tracking-tight">Heart Health</h2>
+
+      <!-- Metric Pills -->
+      <div class="flex items-center gap-2 text-[10px] font-bold">
+        <span class="bg-[#EDE4F2] text-[#6A4B82] px-2.5 py-1 rounded-xl">Stretch: 78%</span>
+        <span class="bg-[#E4EEF2] text-[#3A6878] px-2.5 py-1 rounded-xl">Endurance: 64%</span>
+        <span class="bg-[#F3EDE2] text-[#78603A] px-2.5 py-1 rounded-xl">Stability: 71%</span>
+      </div>
+
+      <!-- 3D Botanical Organic Heart Illustration -->
+      <div class="relative py-2 flex items-center justify-between">
+        <button class="w-8 h-8 rounded-full bg-white border border-[#E8DFC8] flex items-center justify-center text-xs text-[#191C1A] shadow-sm">❮</button>
+        <div class="text-center relative">
+          <div class="text-7xl drop-shadow-md">🫀</div>
+          <div class="text-2xl absolute -bottom-1 left-2">🌿🌸</div>
+        </div>
+        <button class="w-8 h-8 rounded-full bg-white border border-[#E8DFC8] flex items-center justify-center text-xs text-[#191C1A] shadow-sm">❯</button>
+      </div>
+
+      <!-- Sleep Time Card (Screen 3 from Reference) -->
+      <div class="bg-white border border-[#E8DFC8] rounded-[24px] p-4 shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <span class="text-xs font-bold text-[#6B726C] block">Sleep Time</span>
+            <div class="flex items-baseline gap-1 mt-0.5">
+              <span class="text-2xl font-black text-[#191C1A]">7<span class="text-base font-bold text-[#6B726C]">h</span>30<span class="text-base font-bold text-[#6B726C]">m</span></span>
+              <span class="text-xs text-[#6B726C] ml-1">last night</span>
+            </div>
+          </div>
+          <div class="w-12 h-12 rounded-2xl bg-[#F7F2EA] flex items-center justify-center text-2xl shadow-inner">
+            🌙
+          </div>
+        </div>
+        <!-- 7-Day Checkmarks -->
+        <div class="flex justify-between border-t border-[#F3EDE2] pt-2.5 px-1">
+          <span class="w-5 h-5 rounded-full bg-[#EB7142] text-white text-[10px] font-bold flex items-center justify-center">✓</span>
+          <span class="w-5 h-5 rounded-full bg-[#EB7142] text-white text-[10px] font-bold flex items-center justify-center">✓</span>
+          <span class="w-5 h-5 rounded-full bg-[#EB7142] text-white text-[10px] font-bold flex items-center justify-center">✓</span>
+          <span class="w-5 h-5 rounded-full bg-[#EB7142] text-white text-[10px] font-bold flex items-center justify-center">✓</span>
+          <span class="w-5 h-5 rounded-full bg-[#EAE1D3]"></span>
+          <span class="w-5 h-5 rounded-full bg-[#EAE1D3]"></span>
+          <span class="w-5 h-5 rounded-full bg-[#EAE1D3]"></span>
+        </div>
+      </div>
+
+      <!-- Performing Stretch Routine with Circular Play Button -->
+      <div class="bg-white border border-[#E8DFC8] rounded-[24px] p-3.5 flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-[#F3EDE2] flex items-center justify-center text-2xl">
+            🧘‍♀️
+          </div>
+          <div>
+            <h4 class="text-xs font-black text-[#191C1A]">Performing stretch</h4>
+            <p class="text-[10px] text-[#6B726C] mt-0.5">Hold stretch for 20-30 minutes per day</p>
+            <div class="flex items-center gap-2 mt-1">
+              <span id="stretch-timer-display" class="text-xs font-mono font-extrabold text-[#244A32]">00:30</span>
+              <button onclick="resetStretchTimer()" class="text-[10px] text-[#6B726C] hover:text-[#191C1A]">↺ Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <button id="btn-stretch-play" onclick="toggleStretchTimer()" class="w-11 h-11 rounded-full bg-[#E8F1EC] border-2 border-[#244A32] flex items-center justify-center text-[#244A32] text-sm font-bold shadow-sm hover:scale-105 transition">
+          ▶
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN 4: AI FOOD VISION ==================== -->
+    <div id="screen-scanner" class="screen-view space-y-3.5 hidden">
+      <div class="flex justify-between items-center pt-1">
+        <h2 class="text-xl font-black text-[#191C1A] tracking-tight">AI Food Vision</h2>
+        <span class="text-xs font-bold bg-[#E8F1EC] text-[#244A32] px-2.5 py-0.5 rounded-full border border-[#C5DDCF]">Gemini 1.5</span>
+      </div>
+
+      <div class="relative h-44 rounded-[26px] bg-[#F3EDE2] border-2 border-dashed border-[#244A32]/40 flex flex-col items-center justify-center overflow-hidden">
+        <div class="text-center z-10 p-2">
+          <div class="w-11 h-11 rounded-full bg-white text-[#244A32] flex items-center justify-center mx-auto mb-2 text-xl shadow-sm">📷</div>
+          <p class="text-xs font-extrabold text-[#191C1A]">Salmon Quinoa Bowl Detected</p>
+          <p class="text-[10px] text-[#244A32] font-mono font-bold">94% AI Confidence</p>
+          <button onclick="simulateScan()" class="mt-2.5 px-3.5 py-1 bg-[#244A32] text-white text-[11px] font-bold rounded-lg hover:bg-[#1b3826] transition shadow-sm">
+            Re-Scan Plate ⚡
+          </button>
+        </div>
+      </div>
+
+      <!-- Macros Card -->
+      <div class="bg-white border border-[#E8DFC8] rounded-[24px] p-4 space-y-3 shadow-sm">
+        <div class="flex justify-between items-start">
+          <div>
+            <h3 class="text-sm font-black text-[#191C1A]">Grilled Salmon & Quinoa Bowl</h3>
+            <p class="text-[10px] text-[#244A32] font-semibold">✓ Heart Healthy Omega-3 & Clean Carbs</p>
+          </div>
+        </div>
+
+        <div class="bg-[#FAF8F4] p-2.5 rounded-xl border border-[#E8DFC8] flex items-center justify-between">
+          <span class="text-xs text-[#191C1A] font-bold">Serving Weight:</span>
+          <div class="flex items-center gap-3">
+            <button onclick="adjustServing(-25)" class="w-6 h-6 rounded bg-white text-[#191C1A] font-bold text-xs flex items-center justify-center shadow-sm">-</button>
+            <span id="food-weight-display" class="text-xs font-extrabold text-[#244A32]">350g</span>
+            <button onclick="adjustServing(25)" class="w-6 h-6 rounded bg-white text-[#191C1A] font-bold text-xs flex items-center justify-center shadow-sm">+</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-1.5 text-center">
+          <div class="bg-[#FAF8F4] p-2 rounded-xl border border-[#E8DFC8]">
+            <span id="food-cal-display" class="text-xs font-black text-[#191C1A] block">540</span>
+            <span class="text-[9px] text-[#6B726C]">Calories</span>
+          </div>
+          <div class="bg-[#FAF8F4] p-2 rounded-xl border border-[#E8DFC8]">
+            <span id="food-protein-display" class="text-xs font-black text-[#244A32] block">44g</span>
+            <span class="text-[9px] text-[#6B726C]">Protein</span>
+          </div>
+          <div class="bg-[#FAF8F4] p-2 rounded-xl border border-[#E8DFC8]">
+            <span id="food-carbs-display" class="text-xs font-black text-[#EB7142] block">46g</span>
+            <span class="text-[9px] text-[#6B726C]">Carbs</span>
+          </div>
+          <div class="bg-[#FAF8F4] p-2 rounded-xl border border-[#E8DFC8]">
+            <span id="food-fat-display" class="text-xs font-black text-[#A05A32] block">16g</span>
+            <span class="text-[9px] text-[#6B726C]">Fat</span>
+          </div>
+        </div>
+
+        <button onclick="alert('Meal logged to daily food diary!')" class="w-full py-2.5 bg-[#244A32] hover:bg-[#1b3826] text-white font-extrabold text-xs rounded-xl transition shadow">
+          Log to Diary: Lunch (540 kcal)
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== SCREEN 5: COMMUNITY FEED ==================== -->
+    <div id="screen-community" class="screen-view space-y-3.5 hidden">
+      <div class="flex justify-between items-center pt-1">
+        <h2 class="text-xl font-black text-[#191C1A] tracking-tight">Community Feed</h2>
+        <button onclick="alert('Share Modal Opened')" class="text-xs font-bold bg-[#244A32] text-white px-3.5 py-1 rounded-full shadow-sm">
+          + Share
+        </button>
+      </div>
+
+      <div class="bg-white border border-[#E8DFC8] rounded-[24px] p-3.5 space-y-2.5 shadow-sm">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-[#F3EDE2] flex items-center justify-center text-sm font-bold">ML</div>
+            <div>
+              <span class="text-xs font-bold text-[#191C1A] block">Maya Lin</span>
+              <span class="text-[10px] text-[#6B726C]">2h ago • Level 4</span>
+            </div>
+          </div>
+          <span class="text-[9px] font-bold text-[#244A32] bg-[#E8F1EC] px-2 py-0.5 rounded">Stretch Done</span>
+        </div>
+        <p class="text-xs text-[#191C1A] leading-relaxed">
+          Completed the 30-min mobility stretch routine! Heart rate stayed at a steady 94 bpm. Feeling grounded and rejuvenated 🌿✨
+        </p>
+        <div class="flex justify-between items-center border-t border-[#F3EDE2] pt-2 text-xs text-[#6B726C]">
+          <button onclick="toggleLike(this)" class="hover:text-[#EB7142] transition flex items-center gap-1 font-semibold">
+            <span>👏</span> <span class="like-count">24</span> High-Fives
+          </button>
+          <span>💬 6 Comments</span>
+          <span>🔗 Share</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Floating Bottom Charcoal Navigation Dock (Exact Match to Reference Image) -->
+  <nav class="absolute bottom-4 left-5 right-5 h-16 bg-[#161A17] rounded-[36px] px-3 flex justify-around items-center z-40 shadow-2xl">
+    <!-- Tab 1: Home -->
+    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="dock-tab w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#244A32] shadow-sm transition">
+      <span class="text-base font-bold">🏠</span>
+    </button>
+    <!-- Tab 2: Activity Steps -->
+    <button onclick="switchTab('activity')" id="nav-activity" class="dock-tab w-10 h-10 rounded-full flex items-center justify-center text-[#6F7771] hover:text-white transition">
+      <span class="text-base">👟</span>
+    </button>
+    <!-- Tab 3: Workouts & Heart Health -->
+    <button onclick="switchTab('workouts')" id="nav-workouts" class="dock-tab w-10 h-10 rounded-full flex items-center justify-center text-[#6F7771] hover:text-white transition">
+      <span class="text-base">🫀</span>
+    </button>
+    <!-- Tab 4: AI Food -->
+    <button onclick="switchTab('scanner')" id="nav-scanner" class="dock-tab w-10 h-10 rounded-full flex items-center justify-center text-[#6F7771] hover:text-white transition">
+      <span class="text-base">📸</span>
+    </button>
+    <!-- Tab 5: Community -->
+    <button onclick="switchTab('community')" id="nav-community" class="dock-tab w-10 h-10 rounded-full flex items-center justify-center text-[#6F7771] hover:text-white transition">
+      <span class="text-base">👥</span>
+    </button>
+  </nav>
+
+  <!-- Mobile Home Indicator Bar -->
+  <div class="w-32 h-1 bg-[#161A17] rounded-full mx-auto mb-1.5 z-40 shrink-0 opacity-40"></div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.screen-view').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.dock-tab').forEach(el => {
+        el.className = 'dock-tab w-10 h-10 rounded-full flex items-center justify-center text-[#6F7771] hover:text-white transition';
+      });
+
+      const activeScreen = document.getElementById('screen-' + tabId);
+      if (activeScreen) activeScreen.classList.remove('hidden');
+
+      const activeNav = document.getElementById('nav-' + tabId);
+      if (activeNav) {
+        activeNav.className = 'dock-tab w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#244A32] shadow-sm transition';
+      }
+
+      // Scroll viewport back to top smoothly
+      document.getElementById('mobile-viewport').scrollTop = 0;
+    }
+
+    // Stretch Timer
+    let stretchRunning = false;
+    let stretchSec = 30;
+    let stretchInterval = null;
+
+    function toggleStretchTimer() {
+      const btn = document.getElementById('btn-stretch-play');
+      if (stretchRunning) {
+        clearInterval(stretchInterval);
+        stretchRunning = false;
+        btn.innerText = '▶';
+      } else {
+        stretchRunning = true;
+        btn.innerText = '⏸';
+        stretchInterval = setInterval(() => {
+          if (stretchSec > 0) {
+            stretchSec--;
+            document.getElementById('stretch-timer-display').innerText = '00:' + (stretchSec < 10 ? '0' + stretchSec : stretchSec);
+          } else {
+            clearInterval(stretchInterval);
+            stretchRunning = false;
+            btn.innerText = '✓';
+          }
+        }, 1000);
+      }
+    }
+
+    function resetStretchTimer() {
+      clearInterval(stretchInterval);
+      stretchRunning = false;
+      stretchSec = 30;
+      document.getElementById('stretch-timer-display').innerText = '00:30';
+      document.getElementById('btn-stretch-play').innerText = '▶';
+    }
+
+    // Food Scanner Adjuster
+    let baseWeight = 350;
+    function adjustServing(delta) {
+      baseWeight = Math.max(50, baseWeight + delta);
+      const ratio = baseWeight / 350;
+      document.getElementById('food-weight-display').innerText = baseWeight + 'g';
+      document.getElementById('food-cal-display').innerText = Math.round(540 * ratio);
+      document.getElementById('food-protein-display').innerText = (44 * ratio).toFixed(1) + 'g';
+      document.getElementById('food-carbs-display').innerText = (46 * ratio).toFixed(1) + 'g';
+      document.getElementById('food-fat-display').innerText = (16 * ratio).toFixed(1) + 'g';
+    }
+
+    function setHealthPeriod(period) {
+      const dayBtn = document.getElementById('toggle-day');
+      const weekBtn = document.getElementById('toggle-week');
+      if (period === 'day') {
+        dayBtn.className = 'px-3.5 py-1 rounded-full text-xs font-bold bg-[#244A32] text-white shadow-sm transition';
+        weekBtn.className = 'px-3.5 py-1 rounded-full text-xs font-medium text-[#6B726C] hover:text-[#191C1A] transition';
+      } else {
+        weekBtn.className = 'px-3.5 py-1 rounded-full text-xs font-bold bg-[#244A32] text-white shadow-sm transition';
+        dayBtn.className = 'px-3.5 py-1 rounded-full text-xs font-medium text-[#6B726C] hover:text-[#191C1A] transition';
+      }
+    }
+
+    function toggleLike(btn) {
+      const span = btn.querySelector('.like-count');
+      let count = parseInt(span.innerText, 10);
+      if (btn.classList.contains('text-[#EB7142]')) {
+        btn.classList.remove('text-[#EB7142]');
+        span.innerText = count - 1;
+      } else {
+        btn.classList.add('text-[#EB7142]');
+        span.innerText = count + 1;
+      }
+    }
+
+    function simulateScan() {
+      alert('AI Vision Scanner triggered: Plate analyzed with Gemini 1.5 Flash!');
+    }
+  </script>
+</body>
+</html>
