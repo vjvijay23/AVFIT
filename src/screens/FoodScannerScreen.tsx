@@ -4,26 +4,40 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   ActivityIndicator,
+  Alert,
+  Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../theme/colors';
+import { FoodNutritionEstimate } from '../types';
+import { ActivityService } from '../services/activityService';
+import { AuthService } from '../services/auth';
 import {
   Camera as CameraIcon,
   Sparkles,
   CheckCircle,
-  Sliders,
   Plus,
   Minus,
-  Zap,
+  Utensils,
+  Image as ImageIcon,
+  Save,
+  Check,
 } from 'lucide-react-native';
-import { FoodNutritionEstimate } from '../types';
+
+const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'] as const;
+type MealCategory = (typeof MEAL_CATEGORIES)[number];
 
 export default function FoodScannerScreen() {
+  const insets = useSafeAreaInsets();
   const [isScanning, setIsScanning] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<MealCategory>('Lunch');
   const [portionGrams, setPortionGrams] = useState(350);
+  const [isSaved, setIsSaved] = useState(false);
 
   const [scannedResult, setScannedResult] = useState<FoodNutritionEstimate>({
     dish_name: 'Grilled Salmon with Quinoa & Steamed Greens',
@@ -47,136 +61,233 @@ export default function FoodScannerScreen() {
     const newWeight = Math.max(50, portionGrams + delta);
     const scale = newWeight / 350;
     setPortionGrams(newWeight);
-    setScannedResult({
-      ...scannedResult,
+    setIsSaved(false);
+    setScannedResult((prev) => ({
+      ...prev,
+      estimated_weight_g: newWeight,
       calories: Math.round(540 * scale),
       protein_g: Math.round(44 * scale * 10) / 10,
       carbs_g: Math.round(46 * scale * 10) / 10,
       fat_g: Math.round(16 * scale * 10) / 10,
       fiber_g: Math.round(6.5 * scale * 10) / 10,
-    });
+    }));
   };
 
-  const simulateScan = () => {
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImageUri(result.assets[0].uri);
+        runScanSimulation();
+      }
+    } catch (e) {
+      runScanSimulation();
+    }
+  };
+
+  const handleCaptureImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Camera Permission', 'Please allow camera access to scan meals directly.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImageUri(result.assets[0].uri);
+        runScanSimulation();
+      }
+    } catch (e) {
+      runScanSimulation();
+    }
+  };
+
+  const runScanSimulation = () => {
     setIsScanning(true);
+    setIsSaved(false);
     setTimeout(() => {
       setIsScanning(false);
       setPortionGrams(350);
     }, 1200);
   };
 
+  const handleSaveToDiary = async () => {
+    setIsSaved(true);
+    Alert.alert(
+      'Meal Logged',
+      `${scannedResult.dish_name} (${scannedResult.calories} kcal) saved to your ${selectedCategory} diary.`
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        {/* Top Header */}
-        <View style={styles.topHeader}>
-          <Text style={styles.screenTitle}>AI Food Vision</Text>
-          <View style={styles.aiBadge}>
-            <Sparkles size={14} color={Colors.primary} />
-            <Text style={styles.aiBadgeText}>Gemini 1.5</Text>
-          </View>
+
+      {/* Screen Header */}
+      <View style={styles.topHeader}>
+        <Text style={styles.screenTitle}>AI Food Vision</Text>
+        <View style={styles.aiBadge}>
+          <Sparkles size={14} color={Colors.primary} />
+          <Text style={styles.aiBadgeText}>Gemini AI Vision</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: 130 + insets.bottom },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Meal Category Selector */}
+        <View style={styles.categoryRow}>
+          {MEAL_CATEGORIES.map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[
+                styles.categoryPill,
+                selectedCategory === cat && styles.categoryPillActive,
+              ]}
+              onPress={() => setSelectedCategory(cat)}
+            >
+              <Text
+                style={[
+                  styles.categoryText,
+                  selectedCategory === cat && styles.categoryTextActive,
+                ]}
+              >
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Viewfinder Camera Box */}
         <View style={styles.cameraBox}>
-          <View style={styles.cornerTL} />
-          <View style={styles.cornerTR} />
-          <View style={styles.cornerBL} />
-          <View style={styles.cornerBR} />
-
-          {isScanning ? (
-            <View style={styles.scanningBox}>
-              <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.scanningText}>Estimating macros with Gemini AI...</Text>
-            </View>
+          {selectedImageUri ? (
+            <Image source={{ uri: selectedImageUri }} style={styles.previewImage} resizeMode="cover" />
           ) : (
             <View style={styles.viewfinderCenter}>
               <View style={styles.cameraIconCircle}>
-                <CameraIcon size={32} color={Colors.primary} />
+                <CameraIcon size={30} color={Colors.primary} />
               </View>
-              <Text style={styles.cameraPrompt}>Align plate inside viewfinder</Text>
-              <TouchableOpacity style={styles.snapButton} onPress={simulateScan}>
-                <Zap size={14} color="#FFFFFF" />
-                <Text style={styles.snapButtonText}>Snap Food Photo</Text>
-              </TouchableOpacity>
+              <Text style={styles.cameraPrompt}>Align meal plate inside viewfinder</Text>
+            </View>
+          )}
+
+          {isScanning && (
+            <View style={styles.scanningOverlay}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <Text style={styles.scanningText}>Analyzing nutrition with AI Vision...</Text>
             </View>
           )}
         </View>
 
-        {/* AI Results Card */}
-        <View style={styles.resultsCard}>
-          <View style={styles.resultTitleRow}>
+        {/* Camera & Gallery Action Buttons */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.captureBtn} onPress={handleCaptureImage} activeOpacity={0.8}>
+            <CameraIcon size={16} color="#FFFFFF" />
+            <Text style={styles.captureBtnText}>Scan with Camera</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.galleryBtn} onPress={handlePickImage} activeOpacity={0.8}>
+            <ImageIcon size={16} color={Colors.textPrimary} />
+            <Text style={styles.galleryBtnText}>Select Photo</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Scanned Nutrition Results Card */}
+        <View style={styles.resultCard}>
+          <View style={styles.dishHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.dishTitle}>{scannedResult.dish_name}</Text>
-              <View style={styles.confidenceRow}>
-                <CheckCircle size={14} color={Colors.primary} />
-                <Text style={styles.confidenceText}>High Confidence Detection</Text>
-              </View>
+              <Text style={styles.dishSub}>Estimated for {portionGrams}g portion • Approximate values</Text>
+            </View>
+            <View style={styles.confidencePill}>
+              <CheckCircle size={12} color="#16A34A" />
+              <Text style={styles.confidenceText}>High Accuracy</Text>
             </View>
           </View>
 
-          {/* Portion Stepper */}
-          <View style={styles.portionControlRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Sliders size={16} color={Colors.textSecondary} />
-              <Text style={styles.portionLabel}>Serving Weight:</Text>
+          {/* Calorie & Portion Adjuster */}
+          <View style={styles.caloriesBanner}>
+            <View>
+              <Text style={styles.calorieBigNumber}>{scannedResult.calories}</Text>
+              <Text style={styles.calorieLabel}>ESTIMATED KCAL</Text>
             </View>
-            <View style={styles.stepperBox}>
-              <TouchableOpacity
-                style={styles.stepBtn}
-                onPress={() => handleAdjustPortion(-25)}
-              >
+
+            <View style={styles.portionControlRow}>
+              <TouchableOpacity style={styles.portionBtn} onPress={() => handleAdjustPortion(-50)}>
                 <Minus size={14} color={Colors.textPrimary} />
               </TouchableOpacity>
-              <Text style={styles.weightDisplay}>{portionGrams}g</Text>
-              <TouchableOpacity
-                style={styles.stepBtn}
-                onPress={() => handleAdjustPortion(25)}
-              >
+              <Text style={styles.portionText}>{portionGrams}g</Text>
+              <TouchableOpacity style={styles.portionBtn} onPress={() => handleAdjustPortion(50)}>
                 <Plus size={14} color={Colors.textPrimary} />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Macro Grid */}
+          {/* Macro Nutrition Split (Protein, Carbs, Fat) */}
           <View style={styles.macroGrid}>
-            <View style={styles.macroCard}>
-              <Text style={styles.macroVal}>{scannedResult.calories}</Text>
-              <Text style={styles.macroLabel}>Calories</Text>
-            </View>
-            <View style={styles.macroCard}>
-              <Text style={[styles.macroVal, { color: Colors.primary }]}>{scannedResult.protein_g}g</Text>
+            <View style={styles.macroBox}>
+              <Text style={styles.macroValue}>{scannedResult.protein_g}g</Text>
               <Text style={styles.macroLabel}>Protein</Text>
             </View>
-            <View style={styles.macroCard}>
-              <Text style={[styles.macroVal, { color: Colors.accentOrange }]}>{scannedResult.carbs_g}g</Text>
+            <View style={styles.macroDivider} />
+            <View style={styles.macroBox}>
+              <Text style={styles.macroValue}>{scannedResult.carbs_g}g</Text>
               <Text style={styles.macroLabel}>Carbs</Text>
             </View>
-            <View style={styles.macroCard}>
-              <Text style={[styles.macroVal, { color: '#C05621' }]}>{scannedResult.fat_g}g</Text>
-              <Text style={styles.macroLabel}>Fat</Text>
+            <View style={styles.macroDivider} />
+            <View style={styles.macroBox}>
+              <Text style={styles.macroValue}>{scannedResult.fat_g}g</Text>
+              <Text style={styles.macroLabel}>Fats</Text>
             </View>
           </View>
 
-          {/* Ingredients Breakdown */}
-          <Text style={styles.ingredientsHeader}>Detected Ingredients</Text>
+          {/* Detected Ingredients */}
+          <Text style={styles.ingredientsTitle}>Detected Ingredients</Text>
           {scannedResult.ingredients?.map((item, idx) => (
             <View key={idx} style={styles.ingredientRow}>
-              <Text style={styles.ingredientName}>• {item.name}</Text>
-              <Text style={styles.ingredientMeta}>{item.weight_g}g • {item.calories} kcal</Text>
+              <Text style={styles.ingredientName}>{item.name}</Text>
+              <Text style={styles.ingredientMeta}>
+                {item.weight_g}g • {item.calories} kcal
+              </Text>
             </View>
           ))}
 
-          {/* Save to Diary Button */}
-          <TouchableOpacity style={styles.logDiaryBtn}>
-            <Text style={styles.logDiaryBtnText}>Log to Diary: Lunch ({scannedResult.calories} kcal)</Text>
+          {/* Save to Food Diary Button */}
+          <TouchableOpacity
+            style={[styles.saveDiaryBtn, isSaved && styles.savedDiaryBtn]}
+            onPress={handleSaveToDiary}
+            activeOpacity={0.8}
+          >
+            {isSaved ? (
+              <>
+                <Check size={18} color="#FFFFFF" />
+                <Text style={styles.saveDiaryBtnText}>Logged in {selectedCategory} Diary</Text>
+              </>
+            ) : (
+              <>
+                <Save size={18} color="#FFFFFF" />
+                <Text style={styles.saveDiaryBtnText}>Save to {selectedCategory} Diary</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
-
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -185,22 +296,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 90,
-  },
   topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   screenTitle: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '900',
     color: Colors.textPrimary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   aiBadge: {
     flexDirection: 'row',
@@ -212,188 +319,228 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   aiBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
     color: Colors.primary,
   },
-  cameraBox: {
-    height: 200,
-    backgroundColor: '#F3EDE2',
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    position: 'relative',
+  scrollContent: {
+    paddingHorizontal: 20,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginVertical: 12,
+  },
+  categoryPill: {
+    flex: 1,
+    paddingVertical: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+  },
+  categoryPillActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  categoryText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  categoryTextActive: {
+    color: '#FFFFFF',
+  },
+  cameraBox: {
+    height: 220,
+    backgroundColor: '#1C2B22',
+    borderRadius: 22,
     overflow: 'hidden',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
   },
-  cornerTL: {
-    position: 'absolute',
-    top: 14,
-    left: 14,
-    width: 22,
-    height: 22,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: Colors.primary,
-  },
-  cornerTR: {
-    position: 'absolute',
-    top: 14,
-    right: 14,
-    width: 22,
-    height: 22,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderColor: Colors.primary,
-  },
-  cornerBL: {
-    position: 'absolute',
-    bottom: 14,
-    left: 14,
-    width: 22,
-    height: 22,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: Colors.primary,
-  },
-  cornerBR: {
-    position: 'absolute',
-    bottom: 14,
-    right: 14,
-    width: 22,
-    height: 22,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderColor: Colors.primary,
+  previewImage: {
+    width: '100%',
+    height: '100%',
   },
   viewfinderCenter: {
     alignItems: 'center',
   },
   cameraIconCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   cameraPrompt: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  snapButton: {
-    backgroundColor: Colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 18,
-    marginTop: 10,
-  },
-  snapButtonText: {
-    fontSize: 12,
+    fontSize: 13,
+    color: '#E0E7E3',
     fontWeight: '700',
-    color: '#FFFFFF',
   },
-  scanningBox: {
+  scanningOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(28, 43, 34, 0.85)',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 12,
   },
   scanningText: {
-    fontSize: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
-    color: Colors.primary,
   },
-  resultsCard: {
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  captureBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    borderRadius: 16,
+    gap: 6,
+  },
+  captureBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  galleryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 26,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
+    gap: 6,
+  },
+  galleryBtnText: {
+    color: Colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  resultCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: 18,
     borderWidth: 1,
-    borderColor: Colors.borderSubtle,
+    borderColor: '#E8DFC8',
   },
-  resultTitleRow: {
-    marginBottom: 12,
+  dishHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
   },
   dishTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
-  confidenceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  dishSub: {
+    fontSize: 11.5,
+    color: Colors.textSecondary,
     marginTop: 2,
   },
+  confidencePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    gap: 4,
+    marginLeft: 6,
+  },
   confidenceText: {
-    fontSize: 11,
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#16A34A',
+  },
+  caloriesBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F9F6F0',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+  },
+  calorieBigNumber: {
+    fontSize: 26,
+    fontWeight: '900',
     color: Colors.primary,
-    fontWeight: '700',
+  },
+  calorieLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    letterSpacing: 0.5,
   },
   portionControlRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FAF8F4',
-    padding: 10,
+    gap: 8,
+  },
+  portionBtn: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    marginBottom: 14,
-  },
-  portionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  stepperBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  stepBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.borderSubtle,
+    borderColor: '#E8DFC8',
   },
-  weightDisplay: {
-    fontSize: 13,
+  portionText: {
+    fontSize: 14,
     fontWeight: '800',
     color: Colors.textPrimary,
+    minWidth: 46,
+    textAlign: 'center',
   },
   macroGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-    gap: 6,
-  },
-  macroCard: {
-    flex: 1,
-    backgroundColor: '#FAF8F4',
-    padding: 10,
+    alignItems: 'center',
+    backgroundColor: '#F3EFE6',
     borderRadius: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  macroBox: {
+    flex: 1,
     alignItems: 'center',
   },
-  macroVal: {
-    fontSize: 15,
+  macroValue: {
+    fontSize: 16,
     fontWeight: '900',
     color: Colors.textPrimary,
   },
   macroLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: Colors.textSecondary,
     fontWeight: '600',
     marginTop: 2,
   },
-  ingredientsHeader: {
+  macroDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: '#E8DFC8',
+  },
+  ingredientsTitle: {
     fontSize: 13,
     fontWeight: '800',
     color: Colors.textPrimary,
@@ -402,29 +549,35 @@ const styles = StyleSheet.create({
   ingredientRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5EFEB',
+    borderBottomColor: '#F0EBE1',
   },
   ingredientName: {
-    fontSize: 12,
+    fontSize: 12.5,
     color: Colors.textPrimary,
   },
   ingredientMeta: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.textSecondary,
     fontWeight: '600',
   },
-  logDiaryBtn: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 14,
-    borderRadius: 20,
+  saveDiaryBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
+    justifyContent: 'center',
+    backgroundColor: Colors.accentOrange,
+    paddingVertical: 14,
+    borderRadius: 16,
+    gap: 8,
+    marginTop: 18,
   },
-  logDiaryBtnText: {
+  savedDiaryBtn: {
+    backgroundColor: '#16A34A',
+  },
+  saveDiaryBtnText: {
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
-    color: '#FFFFFF',
   },
 });

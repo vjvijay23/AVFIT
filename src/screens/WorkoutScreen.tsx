@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import {
   ChevronLeft,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react-native';
 
 export default function WorkoutScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const [timeToggle, setTimeToggle] = useState<'Day' | 'Week'>('Day');
   const [isPlaying, setIsPlaying] = useState(false);
   const [restSeconds, setRestSeconds] = useState(30);
@@ -47,9 +48,12 @@ export default function WorkoutScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 130 + insets.bottom }]}
+      >
         
         {/* Top Header: Back Chevron & Day/Week Pill Toggle (Exact Match to Screen 3) */}
         <View style={styles.topHeader}>
@@ -196,7 +200,7 @@ export default function WorkoutScreen({ navigation }: any) {
         </View>
 
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

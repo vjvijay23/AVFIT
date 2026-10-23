@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import {
   Heart,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react-native';
 
 export default function CommunityScreen() {
+  const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState([
     {
       id: '1',
@@ -62,9 +63,12 @@ export default function CommunityScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 130 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
         
         {/* Top Header */}
         <View style={styles.topHeader}>
@@ -142,7 +146,7 @@ export default function CommunityScreen() {
         ))}
 
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
