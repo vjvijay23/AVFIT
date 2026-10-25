@@ -67,6 +67,10 @@ export default function ActivityTrackerScreen({ navigation }: any) {
   const activeSportConfig = SPORT_OPTIONS.find((s) => s.id === selectedSport) || SPORT_OPTIONS[0];
 
   const handleStartActivity = () => {
+    if (selectedSport === 'walking') {
+      navigation.navigate('LiveWalkingAnalyzer');
+      return;
+    }
     navigation.navigate('RecordActivity', { initialSport: selectedSport });
   };
 
@@ -190,6 +194,29 @@ export default function ActivityTrackerScreen({ navigation }: any) {
             <Text style={styles.startActionText}>{activeSportConfig.actionLabel}</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Strava Engine Live Walking Analyzer Launcher */}
+        <TouchableOpacity
+          style={styles.walkingAnalyzerBanner}
+          onPress={() => navigation.navigate('LiveWalkingAnalyzer')}
+          activeOpacity={0.88}
+        >
+          <View style={styles.walkingAnalyzerIconCircle}>
+            <Navigation size={18} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.walkingAnalyzerTitle}>Live Walking Analyzer</Text>
+              <View style={styles.stravaEngineBadge}>
+                <Text style={styles.stravaEngineBadgeText}>STRAVA ENGINE</Text>
+              </View>
+            </View>
+            <Text style={styles.walkingAnalyzerSub}>
+              Screen-OFF background tracking • Fused GPS • Live Pace HUD
+            </Text>
+          </View>
+          <ChevronRight size={18} color="#94A3B8" />
+        </TouchableOpacity>
 
         {/* Authenticated User's Real Daily Fitness Summary */}
         <View style={styles.dailySummaryCard}>
@@ -636,5 +663,51 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     marginTop: 1,
+  },
+  walkingAnalyzerBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#FC520025',
+    marginBottom: 16,
+    shadowColor: '#FC5200',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  walkingAnalyzerIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FC5200',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  walkingAnalyzerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  stravaEngineBadge: {
+    backgroundColor: '#FC520015',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 6,
+  },
+  stravaEngineBadgeText: {
+    color: '#FC5200',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  walkingAnalyzerSub: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });

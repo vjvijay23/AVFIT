@@ -30,6 +30,7 @@ import AchievementsScreen from '../screens/achievements/AchievementsScreen';
 import ProfileEditScreen from '../screens/profile/ProfileEditScreen';
 import RecordActivityScreen from '../screens/activity/RecordActivityScreen';
 import ActivitySummaryScreen from '../screens/activity/ActivitySummaryScreen';
+import { LiveWalkingAnalyzerScreen } from '../modules/walking-analyzer';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -154,6 +155,10 @@ export default function RootNavigator() {
       <Stack.Screen name="RecordActivity" component={RecordActivityScreen} />
       <Stack.Screen name="Record" component={RecordActivityScreen} />
       <Stack.Screen name="ActivitySummary" component={ActivitySummaryScreen} />
+
+      {/* Strava-grade Live Walking Analyzer (Screen-off Foreground Service) */}
+      <Stack.Screen name="LiveWalkingAnalyzer" component={LiveWalkingAnalyzerScreen} />
+      <Stack.Screen name="WalkingAnalyzer" component={LiveWalkingAnalyzerScreen} />
 
       {/* Gamified Achievements & Trophy Room */}
       <Stack.Screen name="Achievements" component={AchievementsScreen} />
