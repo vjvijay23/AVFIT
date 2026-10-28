@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
 import { AuthService } from '../../services/auth';
+import { OTP_CODE_LENGTH } from '../../services/otpConfig';
 import AvfitLogo from '../../components/common/AvfitLogo';
 import {
   ShieldCheck,
@@ -51,7 +52,7 @@ export default function OtpVerificationScreen({
   const pendingProfile = route?.params?.pendingProfile;
   const [developmentOtp, setDevelopmentOtp] = useState(route?.params?.developmentOtp);
 
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const [otpDigits, setOtpDigits] = useState(() => Array.from({ length: OTP_CODE_LENGTH }, () => ''));
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +60,7 @@ export default function OtpVerificationScreen({
   const [successNotice, setSuccessNotice] = useState<string | null>(
     route?.params?.developmentOtp
       ? `Development mock OTP: ${route.params.developmentOtp}. No SMS was sent.`
-      : 'Enter the 6-digit verification code sent to your phone.'
+      : `Enter the ${OTP_CODE_LENGTH}-digit verification code sent to your phone.`
   );
 
   const inputRefs = useRef<Array<TextInput | null>>([]);
@@ -86,13 +87,13 @@ export default function OtpVerificationScreen({
     setOtpDigits(newDigits);
 
     // Auto advance focus to next input
-    if (cleaned && index < 5) {
+    if (cleaned && index < OTP_CODE_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto-verify if all 6 digits are populated
+    // Auto-verify when every configured OTP digit is populated.
     const completeCode = newDigits.join('');
-    if (completeCode.length === 6) {
+    if (completeCode.length === OTP_CODE_LENGTH) {
       verifyCode(completeCode);
     }
   };
@@ -105,8 +106,8 @@ export default function OtpVerificationScreen({
 
   const verifyCode = async (tokenOverride?: string) => {
     const code = tokenOverride || otpDigits.join('');
-    if (code.length !== 6) {
-      setErrorMessage('Please enter all 6 digits of your OTP.');
+    if (code.length !== OTP_CODE_LENGTH || !/^\d+$/.test(code)) {
+      setErrorMessage(`Please enter all ${OTP_CODE_LENGTH} digits of your OTP.`);
       return;
     }
 
@@ -158,7 +159,7 @@ export default function OtpVerificationScreen({
       setSuccessNotice(response.developmentOtp
         ? `Development mock OTP: ${response.developmentOtp}. No SMS was sent.`
         : response.message || 'A new verification code was sent to your phone.');
-      setOtpDigits(['', '', '', '', '', '']);
+      setOtpDigits(Array.from({ length: OTP_CODE_LENGTH }, () => ''));
       inputRefs.current[0]?.focus();
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to resend code. Please try again shortly.');
@@ -190,7 +191,7 @@ export default function OtpVerificationScreen({
             <Lock size={28} color={Colors.primary} />
           </View>
 
-          <Text style={styles.title}>Enter 6-Digit OTP</Text>
+          <Text style={styles.title}>Enter {OTP_CODE_LENGTH}-Digit OTP</Text>
           <Text style={styles.subtitle}>
             {developmentOtp ? 'Use the development code shown below:' : "We've sent a one-time verification code to:"}
           </Text>
@@ -226,7 +227,7 @@ export default function OtpVerificationScreen({
             </View>
           )}
 
-          {/* 6 Digit Input Cells */}
+          {/* OTP input cells follow the configured provider length. */}
           <View style={styles.otpInputRow}>
             {otpDigits.map((digit, idx) => (
               <TextInput

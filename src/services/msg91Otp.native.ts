@@ -8,10 +8,25 @@ const { OTPWidget } = require('@msg91comm/sendotp-react-native') as {
   };
 };
 
-const widgetId = process.env.EXPO_PUBLIC_MSG91_WIDGET_ID || '';
-const tokenAuth = process.env.EXPO_PUBLIC_MSG91_TOKEN_AUTH || '';
+const widgetId = process.env.EXPO_PUBLIC_MSG91_MOBILE_WIDGET_ID || process.env.EXPO_PUBLIC_MSG91_WIDGET_ID || '';
+const tokenAuth = process.env.EXPO_PUBLIC_MSG91_MOBILE_TOKEN_AUTH || process.env.EXPO_PUBLIC_MSG91_TOKEN_AUTH || '';
 const requestIds = new Map<string, string>();
 let initialized = false;
+const MSG91_OPERATION_TIMEOUT_MS = 20000;
+
+export async function prepareWidget(): Promise<void> {
+  configureWidget();
+}
+
+async function withOperationTimeout<T>(operation: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    operation,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('MSG91 did not respond. Check your connection and widget configuration, then try again.')), MSG91_OPERATION_TIMEOUT_MS);
+    }),
+  ]).finally(() => { if (timer) clearTimeout(timer); });
+}
 
 function configureWidget() {
   if (!widgetId || !tokenAuth) {
@@ -32,7 +47,7 @@ function phoneIdentifier(phone: string) {
 export async function sendOtp(phone: string): Promise<void> {
   configureWidget();
   const identifier = phoneIdentifier(phone);
-  const result = await OTPWidget.sendOTP({ identifier }) as { type?: string; message?: string; invisibleVerified?: boolean };
+  const result = await withOperationTimeout(OTPWidget.sendOTP({ identifier })) as { type?: string; message?: string; invisibleVerified?: boolean };
   if (result?.type !== 'success' || !result.message || result.invisibleVerified) {
     throw new Error(result?.invisibleVerified
       ? 'MSG91 invisible OTP is enabled. Turn it off in the widget to use AVFIT’s code-entry screen.'
@@ -47,7 +62,7 @@ export async function verifyOtp(phone: string, otp: string): Promise<string> {
   const reqId = requestIds.get(identifier);
   if (!reqId) throw new Error('This verification request expired. Request a new code and try again.');
 
-  const result = await OTPWidget.verifyOTP({ reqId, otp }) as { type?: string; message?: string; 'access-token'?: string };
+  const result = await withOperationTimeout(OTPWidget.verifyOTP({ reqId, otp })) as { type?: string; message?: string; 'access-token'?: string };
   const accessToken = result?.['access-token'] || result?.message;
   if (result?.type !== 'success' || typeof accessToken !== 'string' || accessToken.length < 20) {
     throw new Error('Invalid or expired verification code. Check the code and try again.');
@@ -62,6 +77,6 @@ export async function resendOtp(phone: string): Promise<void> {
   const reqId = requestIds.get(identifier);
   if (!reqId) throw new Error('This verification request expired. Go back and request a new code.');
 
-  const result = await OTPWidget.retryOTP({ reqId, retryChannel: 11 }) as { type?: string };
+  const result = await withOperationTimeout(OTPWidget.retryOTP({ reqId, retryChannel: 11 })) as { type?: string };
   if (result?.type !== 'success') throw new Error('MSG91 could not resend the code. Wait a moment and try again.');
 }

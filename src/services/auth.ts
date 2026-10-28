@@ -3,6 +3,7 @@ import { AuthUser, PhoneAuthRequest, OtpVerifyRequest, UserProfile, Gender } fro
 import { UserStore } from './userStore';
 import { BackendApi } from './backendApi';
 import * as Msg91Otp from './msg91Otp';
+import { OTP_CODE_LENGTH } from './otpConfig';
 
 export interface PendingSignupData {
   fullName: string;
@@ -65,7 +66,7 @@ export const AuthService = {
   },
 
   /**
-   * Verify the 6-digit OTP code for the phone number.
+   * Verify the OTP code for the phone number.
    * New users are initialized with 0 stats and 0 trophies.
    * Returning users retain their existing statistics.
    */
@@ -77,8 +78,8 @@ export const AuthService = {
     const { phone, token } = request;
     const cleanToken = token.trim();
 
-    if (cleanToken.length !== 6) {
-      throw new Error('Please enter the complete 6-digit verification code.');
+    if (cleanToken.length !== OTP_CODE_LENGTH || !/^\d+$/.test(cleanToken)) {
+      throw new Error(`Please enter the complete ${OTP_CODE_LENGTH}-digit verification code.`);
     }
 
     const accessToken = process.env.EXPO_PUBLIC_OTP_PROVIDER === 'msg91'

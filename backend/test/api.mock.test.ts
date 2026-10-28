@@ -7,6 +7,9 @@ process.env.PORT = '5999';
 process.env.REDIS_URL = 'redis://127.0.0.1:6399';
 process.env.DATABASE_URL = 'postgres://mock:mock@127.0.0.1:55432/mock_api_test';
 process.env.JWT_SECRET = 'mock-api-test-secret-that-is-long-enough';
+// backend/.env may select MSG91 for local development; the existing cases
+// below intentionally exercise Twilio and must not inherit that setting.
+process.env.OTP_PROVIDER = 'twilio';
 process.env.TWILIO_ACCOUNT_SID = 'AC00000000000000000000000000000000';
 process.env.TWILIO_AUTH_TOKEN = 'mock-auth-token';
 process.env.TWILIO_VERIFY_SERVICE_SID = 'VA00000000000000000000000000000000';
@@ -163,6 +166,80 @@ test('OTP send fails closed when Twilio credentials are missing', async () => {
   } finally {
     [config.twilioAccountSid, config.twilioAuthToken, config.twilioVerifyServiceSid] = previous;
   }
+});
+
+test('MSG91 access-token verification works even when the backend OTP sender defaults to Twilio', async () => {
+  const previous = { provider: config.otpProvider, authKey: config.msg91AuthKey };
+  config.otpProvider = 'twilio';
+  config.msg91AuthKey = 'mock-msg91-authkey';
+  const accessToken = 'mock-msg91-access-token-0001';
+  let requestedUrl = '';
+  let requestedBody: Record<string, string> = {};
+  globalThis.fetch = (async (input, init) => {
+    requestedUrl = String(input);
+    requestedBody = JSON.parse(String(init?.body || '{}'));
+    return new Response(JSON.stringify({ type: 'success', message: mockPhone }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }) as typeof fetch;
+  queryHandler = async () => ({ rows: [{
+    id: mockUserId,
+    phone: mockPhone,
+    full_name: 'Mock Athlete',
+    avatar_url: null,
+    streak_count: 3,
+    is_onboarded: true,
+  }], rowCount: 1 });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/otp/verify',
+      payload: { phone: mockPhone, accessToken, authMode: 'login' },
+    });
+    const body = response.json();
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(requestedUrl, 'https://control.msg91.com/api/v5/widget/verifyAccessToken');
+    assert.equal(requestedBody.authkey, 'mock-msg91-authkey');
+    assert.equal(requestedBody['access-token'], accessToken);
+    assert.equal(body.success, true);
+    assert.equal(body.user.id, mockUserId);
+    assert.equal((await app.jwt.verify<{ id: string }>(body.token)).id, mockUserId);
+  } finally {
+    config.otpProvider = previous.provider;
+    config.msg91AuthKey = previous.authKey;
+  }
+});
+
+test('MSG91 verification rejects a verified token for a different phone before reading user data', async () => {
+  const previous = { provider: config.otpProvider, authKey: config.msg91AuthKey };
+  config.otpProvider = 'twilio';
+  config.msg91AuthKey = 'mock-msg91-authkey';
+  let queryCount = 0;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ type: 'success', message: '+15555550124' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })) as typeof fetch;
+  queryHandler = async () => { queryCount += 1; return { rows: [], rowCount: 0 }; };
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/otp/verify',
+      payload: { phone: mockPhone, accessToken: 'mock-msg91-access-token-0001', authMode: 'login' },
+    });
+    assert.equal(response.statusCode, 401);
+    assert.match(response.json().error, /Invalid or expired/);
+    assert.equal(queryCount, 0);
+  } finally {
+    config.otpProvider = previous.provider;
+    config.msg91AuthKey = previous.authKey;
+  }
+});
+
+test('MSG91 widget user-exists validation accepts valid phone identifiers without exposing accounts', async () => {
+  const response = await app.inject({ method: 'GET', url: '/api/v1/auth/otp/user-exists?identifier=919876543210' });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), { user_found: true, identifier: '919876543210' });
 });
 
 test('a pending Twilio verification cannot create an authenticated user', async () => {

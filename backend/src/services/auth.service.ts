@@ -76,7 +76,19 @@ export class AuthService {
     providerAccessToken?: string
   ): Promise<UserProfileData> {
     const cleanPhone = normalizePhone(phone);
-    if (config.otpProvider === 'mock') {
+    // The web/mobile widget verifies the one-time code with MSG91 and sends
+    // its signed access token here. Validate that token whenever supplied,
+    // even if the backend's OTP sender setting still defaults to Twilio.
+    if (providerAccessToken !== undefined && providerAccessToken !== '') {
+      if (typeof providerAccessToken !== 'string' || providerAccessToken.length < 20 || providerAccessToken.length > 5000) {
+        throw new Error('MSG91 verification is incomplete. Verify the code in the app and try again.');
+      }
+      const identifier = await msg91VerifyAccessToken(providerAccessToken);
+      const verifiedPhone = normalizePhone(identifier.startsWith('+') ? identifier : `+${identifier}`);
+      if (verifiedPhone !== cleanPhone) {
+        throw new Error('Invalid or expired verification code. Request a new code and try again.');
+      }
+    } else if (config.otpProvider === 'mock') {
       if (typeof otp !== 'string' || !/^\d{6}$/.test(otp)) throw new Error('Enter the 6-digit verification code sent to your phone.');
       const challenge = mockOtpChallenges.get(cleanPhone);
       if (!challenge || challenge.expiresAt <= Date.now()) {
@@ -91,14 +103,7 @@ export class AuthService {
       }
       mockOtpChallenges.delete(cleanPhone);
     } else if (config.otpProvider === 'msg91') {
-      if (typeof providerAccessToken !== 'string' || providerAccessToken.length < 20 || providerAccessToken.length > 5000) {
-        throw new Error('MSG91 verification is incomplete. Verify the code in the app and try again.');
-      }
-      const identifier = await msg91VerifyAccessToken(providerAccessToken);
-      const verifiedPhone = normalizePhone(identifier.startsWith('+') ? identifier : `+${identifier}`);
-      if (verifiedPhone !== cleanPhone) {
-        throw new Error('Invalid or expired verification code. Request a new code and try again.');
-      }
+      throw new Error('MSG91 verification is incomplete. Verify the code in the app and try again.');
     } else {
       if (typeof otp !== 'string' || !/^\d{6}$/.test(otp)) throw new Error('Enter the 6-digit verification code sent to your phone.');
       const verification = await twilioVerify('VerificationCheck', { To: cleanPhone, Code: otp });

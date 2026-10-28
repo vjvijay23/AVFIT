@@ -14,12 +14,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
 import { AuthService, PendingSignupData } from '../../services/auth';
-import { Gender } from '../../types';
 import AvfitLogo from '../../components/common/AvfitLogo';
+import DateOfBirthPicker from '../../components/common/DateOfBirthPicker';
+import Msg91CaptchaMount from '../../components/common/Msg91CaptchaMount';
 import {
   User,
   Smartphone,
-  Calendar,
   ArrowRight,
   ShieldCheck,
   Check,
@@ -50,7 +50,6 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [selectedCountry, setSelectedCountry] = useState(COUNTRY_CODES[1]); // Default India +91 or +1
   const [phoneNumber, setPhoneNumber] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
-  const [gender, setGender] = useState<Gender>('prefer_not_to_say');
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_OPTIONS[0]);
   const [agreedToTerms, setAgreedToTerms] = useState(true);
 
@@ -107,7 +106,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           phone: fullPhone,
           countryCode: selectedCountry.code,
           dateOfBirth,
-          gender,
+          gender: 'prefer_not_to_say',
           avatarUrl: selectedAvatar,
           country: selectedCountry.name,
         };
@@ -254,60 +253,12 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
             </View>
           )}
 
-          {/* Date of Birth & Gender Row */}
-          <View style={styles.row}>
-            <View style={styles.halfCol}>
-              <Text style={styles.inputLabel}>Birth Date</Text>
-              <View style={styles.inputContainer}>
-                <Calendar size={16} color={Colors.textSecondary} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#9EA6A0"
-                  value={dateOfBirth}
-                  onChangeText={setDateOfBirth}
-                  keyboardType="numbers-and-punctuation"
-                />
-              </View>
-            </View>
+          <Msg91CaptchaMount />
 
-            <View style={styles.halfCol}>
-              <Text style={styles.inputLabel}>Gender</Text>
-              <View style={styles.genderRow}>
-                <TouchableOpacity
-                  style={[styles.miniChip, gender === 'male' && styles.miniChipActive]}
-                  onPress={() => setGender('male')}
-                >
-                  <Text style={[styles.miniChipText, gender === 'male' && styles.miniChipTextActive]}>
-                    M
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.miniChip, gender === 'female' && styles.miniChipActive]}
-                  onPress={() => setGender('female')}
-                >
-                  <Text style={[styles.miniChipText, gender === 'female' && styles.miniChipTextActive]}>
-                    F
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.miniChip, gender === 'non_binary' && styles.miniChipActive]}
-                  onPress={() => setGender('non_binary')}
-                >
-                  <Text style={[styles.miniChipText, gender === 'non_binary' && styles.miniChipTextActive]}>
-                    Other
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.miniChip, gender === 'prefer_not_to_say' && styles.miniChipActive]}
-                  onPress={() => setGender('prefer_not_to_say')}
-                >
-                  <Text style={[styles.miniChipText, gender === 'prefer_not_to_say' && styles.miniChipTextActive]}>
-                    Skip
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+          {/* Date of Birth */}
+          <View style={styles.dateOfBirthField}>
+            <Text style={styles.inputLabel}>Birth Date</Text>
+            <DateOfBirthPicker value={dateOfBirth} onChange={setDateOfBirth} />
           </View>
 
           {/* Terms & Consent Checkbox */}
@@ -539,39 +490,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.primary,
   },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfCol: {
-    flex: 1,
-  },
-  genderRow: {
-    flexDirection: 'row',
-    gap: 4,
-    marginBottom: 14,
-  },
-  miniChip: {
-    flex: 1,
-    paddingVertical: 11,
-    backgroundColor: Colors.surfaceWarm,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  miniChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  miniChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-  },
-  miniChipTextActive: {
-    color: '#FFFFFF',
-  },
+  dateOfBirthField: { marginBottom: 14 },
   termsRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
