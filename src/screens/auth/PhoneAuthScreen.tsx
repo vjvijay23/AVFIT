@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
+import Msg91CaptchaMount from '../../components/common/Msg91CaptchaMount';
 import { AuthService } from '../../services/auth';
+import { OTP_CODE_LENGTH } from '../../services/otpConfig';
 import AvfitLogo from '../../components/common/AvfitLogo';
 import { Smartphone, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react-native';
 
@@ -65,6 +67,7 @@ export default function PhoneAuthScreen({ navigation, onCodeSent }: PhoneAuthScr
             phone: fullPhone,
             countryCode: selectedCountry.code,
             authMode,
+            ...(response.developmentOtp ? { developmentOtp: response.developmentOtp } : {}),
           });
         }
       }
@@ -121,7 +124,7 @@ export default function PhoneAuthScreen({ navigation, onCodeSent }: PhoneAuthScr
             {authMode === 'signup' ? 'Start Your Fitness Journey' : 'Welcome Back'}
           </Text>
           <Text style={styles.subtitle}>
-            Enter your mobile number to receive a secure 6-digit one-time verification code via SMS.
+            Enter your mobile number to receive a secure {OTP_CODE_LENGTH}-digit one-time verification code via SMS.
           </Text>
 
           {errorMessage && (
@@ -181,6 +184,8 @@ export default function PhoneAuthScreen({ navigation, onCodeSent }: PhoneAuthScr
               ))}
             </View>
           )}
+
+          <Msg91CaptchaMount />
 
           {/* Security & Consent Note */}
           <View style={styles.consentBox}>

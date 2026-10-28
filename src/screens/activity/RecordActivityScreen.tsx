@@ -17,6 +17,7 @@ import { ActivityService } from '../../services/activityService';
 import { AuthService } from '../../services/auth';
 import GoogleActivityMap from '../../components/map/GoogleActivityMap';
 import GpsInfoPanel from '../../components/activity/GpsInfoPanel';
+import { GoogleMapsService } from '../../services/googleMapsService';
 import {
   useLocationTracker,
   formatDuration,
@@ -138,10 +139,25 @@ export default function RecordActivityScreen({ route, navigation }: any) {
       );
 
       const sportLabel = SPORT_OPTIONS.find((s) => s.id === selectedSport)?.label || 'Workout';
-      const defaultTitle = `Outdoor ${sportLabel} - ${new Date().toLocaleDateString([], {
+      let defaultTitle = `Outdoor ${sportLabel} - ${new Date().toLocaleDateString([], {
         month: 'short',
         day: 'numeric',
       })}`;
+
+      if (currentLocation) {
+        try {
+          const smartTitle = await GoogleMapsService.generateActivityTitle(
+            sportLabel,
+            currentLocation.latitude,
+            currentLocation.longitude
+          );
+          if (smartTitle) {
+            defaultTitle = smartTitle;
+          }
+        } catch (e) {
+          // fallback to default title
+        }
+      }
 
       const { activity, newlyUnlockedTrophies } = await ActivityService.saveActivity({
         userId: user.id,

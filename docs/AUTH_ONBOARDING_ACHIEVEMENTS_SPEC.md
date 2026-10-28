@@ -133,7 +133,7 @@ Category E: Personal Mastery & Apex
 | File Path | Description |
 | :--- | :--- |
 | `src/types/index.ts` | Complete TypeScript models for Auth, Fitness Profile, and Achievements |
-| `src/services/auth.ts` | Supabase Phone OTP auth service, sandbox mode, session persistence |
+| `src/services/auth.ts` | Phone OTP authentication through the AVFIT backend and SMS verification provider |
 | `src/services/fitnessProfile.ts` | Mifflin-St Jeor engine, BMR/TDEE calculations, macro generator |
 | `src/services/achievements.ts` | 25-trophy catalog, anti-cheat evaluator, summary aggregator |
 | `src/screens/auth/PhoneAuthScreen.tsx` | Phone entry with country selector, validation, and consent banner |

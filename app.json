@@ -2,7 +2,7 @@
   "expo": {
     "name": "AVFIT",
     "slug": "avfit",
-    "version": "1.0.0",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -17,6 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.avfit.app",
+      "buildNumber": "7",
       "infoPlist": {
         "NSCameraUsageDescription": "AVFIT uses your camera to scan food dishes and calculate accurate nutritional macros.",
         "NSPhotoLibraryUsageDescription": "AVFIT allows you to pick food photos and workout progress photos from your library.",
@@ -26,11 +27,7 @@
     },
     "android": {
       "package": "com.avfit.app",
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyDOXGShnzfoG49qXv2vQS_YfYgxmLwLCJE"
-        }
-      },
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F172A"
@@ -51,8 +48,7 @@
     },
     "extra": {
       "supabaseUrl": "https://your-supabase-project.supabase.co",
-      "supabaseAnonKey": "your-supabase-anon-key",
-      "geminiApiKey": "your-gemini-api-key"
+      "supabaseAnonKey": "your-supabase-anon-key"
     }
   }
 }

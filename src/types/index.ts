@@ -90,7 +90,9 @@ export interface FitnessProfile {
   preferredWorkoutDurationMin: number; // e.g. 15, 30, 45, 60
   weeklyWorkoutFrequencyDays: number; // e.g. 3, 4, 5
   dietaryPreference: DietaryPreference;
+  dietaryPreferenceOther?: string;
   allergiesAndRestrictions: string[]; // e.g. ['peanuts', 'gluten', 'dairy', 'lactose']
+  customAllergiesAndRestrictions?: string;
   
   // Calculated Metrics (Mifflin-St Jeor & TDEE)
   bmr: number;
@@ -185,6 +187,10 @@ export interface FoodNutritionEstimate {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+  sugars_g?: number;
+  saturated_fat_g?: number;
+  sodium_mg?: number;
+  cholesterol_mg?: number;
   confidence: 'high' | 'medium' | 'low';
   health_tips?: string;
   ingredients?: Array<{

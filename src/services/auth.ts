@@ -1,6 +1,9 @@
 import { supabase } from './supabase';
 import { AuthUser, PhoneAuthRequest, OtpVerifyRequest, UserProfile, Gender } from '../types';
 import { UserStore } from './userStore';
+import { BackendApi } from './backendApi';
+import * as Msg91Otp from './msg91Otp';
+import { OTP_CODE_LENGTH } from './otpConfig';
 
 export interface PendingSignupData {
   fullName: string;
@@ -23,6 +26,12 @@ const phoneToUserIdMap: Record<string, string> = {
 };
 
 export const AuthService = {
+  async restoreSession(): Promise<boolean> {
+    const userId = await BackendApi.restoreAuthSession();
+    if (!userId) return false;
+    currentActiveUserId = userId;
+    return true;
+  },
   /**
    * Get the active authenticated user's ID
    */
@@ -35,41 +44,29 @@ export const AuthService = {
    */
   async sendPhoneOtp(
     request: PhoneAuthRequest,
-    authMode: 'login' | 'signup' = 'login'
-  ): Promise<{ success: boolean; message: string; isMock?: boolean }> {
+    _authMode: 'login' | 'signup' = 'login'
+  ): Promise<{ success: boolean; message: string; isMock: boolean; developmentOtp?: string }> {
     const fullPhone = request.phone.trim();
     if (!fullPhone || fullPhone.length < 8) {
       throw new Error('Please enter a valid mobile phone number with country code.');
     }
 
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: fullPhone,
-      });
-
-      if (error) {
-        return {
-          success: true,
-          message: 'Verification code sent! (Sandbox mode: Use 123456 to verify)',
-          isMock: true,
-        };
-      }
-
-      return {
-        success: true,
-        message: 'A 6-digit verification code has been sent via SMS.',
-      };
-    } catch (err: any) {
-      return {
-        success: true,
-        message: 'Verification code sent! (Sandbox mode: Use 123456 to verify)',
-        isMock: true,
-      };
+    if (process.env.EXPO_PUBLIC_OTP_PROVIDER === 'msg91') {
+      await Msg91Otp.sendOtp(fullPhone);
+      return { success: true, message: 'Verification code sent by MSG91.', isMock: false };
     }
+
+    const response = await BackendApi.sendOtp(fullPhone);
+    return {
+      success: true,
+      message: response.message,
+      isMock: Boolean(response.isMockOtp),
+      ...(response.developmentOtp ? { developmentOtp: response.developmentOtp } : {}),
+    };
   },
 
   /**
-   * Verify the 6-digit OTP code for the phone number.
+   * Verify the OTP code for the phone number.
    * New users are initialized with 0 stats and 0 trophies.
    * Returning users retain their existing statistics.
    */
@@ -81,56 +78,65 @@ export const AuthService = {
     const { phone, token } = request;
     const cleanToken = token.trim();
 
-    if (cleanToken.length !== 6) {
-      throw new Error('Please enter the complete 6-digit verification code.');
+    if (cleanToken.length !== OTP_CODE_LENGTH || !/^\d+$/.test(cleanToken)) {
+      throw new Error(`Please enter the complete ${OTP_CODE_LENGTH}-digit verification code.`);
     }
 
-    // Check if phone was already registered
-    const existingUserId = phoneToUserIdMap[phone];
-    const isNewUser = authMode === 'signup' || !existingUserId;
-
-    let userId: string;
-    let profile: UserProfile;
-
-    if (isNewUser) {
-      // 1. Generate unique user ID for new user
-      userId = `usr_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      phoneToUserIdMap[phone] = userId;
-
-      // 2. Initialize brand-new user with ALL ZEROES!
-      profile = UserStore.initializeNewUser(
-        userId,
-        phone,
-        pendingProfile?.fullName || 'New Athlete',
-        pendingProfile?.country || 'United States',
-        pendingProfile?.avatarUrl || '🏃‍♂️',
-        pendingProfile?.dateOfBirth,
-        pendingProfile?.gender
-      );
-    } else {
-      // Returning user: Retrieve existing data without resetting
-      userId = existingUserId;
-      const existing = UserStore.getProfile(userId);
-      profile = existing || UserStore.initializeNewUser(userId, phone, 'Alex Vance');
-    }
-
+    const accessToken = process.env.EXPO_PUBLIC_OTP_PROVIDER === 'msg91'
+      ? await Msg91Otp.verifyOtp(phone, cleanToken)
+      : undefined;
+    const response = await BackendApi.verifyOtp(phone, accessToken ? '' : cleanToken, pendingProfile, authMode, accessToken);
+    const isNewUser = response.user.isNewUser ?? authMode === 'signup';
+    const userId = response.user.id;
     currentActiveUserId = userId;
+    phoneToUserIdMap[phone] = userId;
+    const existing = UserStore.getProfile(userId);
+    const profile = existing || UserStore.initializeNewUser(
+      userId,
+      response.user.phone,
+      response.user.fullName || pendingProfile?.fullName || 'New Athlete',
+      response.user.country || pendingProfile?.country || 'United States',
+      response.user.avatarUrl || pendingProfile?.avatarUrl || '🏃‍♂️',
+      response.user.dateOfBirth || pendingProfile?.dateOfBirth,
+      (response.user.gender || pendingProfile?.gender) as Gender | undefined
+    );
+    const normalizedProfile = await this.saveUserProfile({
+      ...profile,
+      phone: response.user.phone,
+      fullName: response.user.fullName || profile.fullName,
+      avatarUrl: response.user.avatarUrl || profile.avatarUrl,
+      dateOfBirth: response.user.dateOfBirth || profile.dateOfBirth,
+      age: ageFromDateOfBirth(response.user.dateOfBirth || profile.dateOfBirth) || profile.age,
+      gender: (response.user.gender || profile.gender) as Gender | undefined,
+      country: response.user.country || profile.country,
+      preferredUnits: (response.user.preferredUnits || profile.preferredUnits) as UserProfile['preferredUnits'],
+      streakCount: response.user.streakCount || 0,
+      isOnboarded: response.user.isOnboarded ?? profile.isOnboarded,
+    });
 
     const authUser: AuthUser = {
       id: userId,
-      phone,
-      countryCode: phone.slice(0, 3) || '+1',
+      phone: response.user.phone,
+      countryCode: response.user.phone.slice(0, 3) || '+1',
       isPhoneVerified: true,
-      isOnboarded: profile.isOnboarded,
-      createdAt: profile.createdAt,
+      isOnboarded: normalizedProfile.isOnboarded,
+      createdAt: normalizedProfile.createdAt,
     };
 
     return {
       success: true,
       user: authUser,
       isNewUser,
-      profile,
+      profile: normalizedProfile,
     };
+  },
+
+  async resendPhoneOtp(request: PhoneAuthRequest): Promise<{ success: boolean; message: string; isMock: boolean; developmentOtp?: string }> {
+    if (process.env.EXPO_PUBLIC_OTP_PROVIDER === 'msg91') {
+      await Msg91Otp.resendOtp(request.phone);
+      return { success: true, message: 'A new verification code was sent by MSG91.', isMock: false };
+    }
+    return this.sendPhoneOtp(request);
   },
 
   /**
@@ -175,6 +181,25 @@ export const AuthService = {
     }
     let profile = UserStore.getProfile(targetId);
 
+    if (BackendApi.hasAuthToken() && targetId === currentActiveUserId) {
+      try {
+        const result = await BackendApi.getProfile(targetId);
+        const row = result.profile;
+        profile = {
+          ...(profile || UserStore.initializeNewUser(targetId, row.phone || '', row.full_name || 'Athlete')),
+          id: String(row.id), phone: row.phone || '', fullName: row.full_name || profile?.fullName || 'Athlete',
+          avatarUrl: row.avatar_url || undefined, dateOfBirth: row.date_of_birth || undefined,
+          age: ageFromDateOfBirth(row.date_of_birth) || profile?.age,
+          gender: row.gender || undefined, country: row.country || 'United States',
+          preferredUnits: row.preferred_units || 'metric', isOnboarded: Boolean(row.is_onboarded),
+          streakCount: Number(row.streak_count || 0), totalPoints: Number(row.total_trophy_points || 0),
+          createdAt: row.created_at || profile?.createdAt || new Date().toISOString(),
+          updatedAt: row.updated_at || new Date().toISOString(),
+        };
+        UserStore.saveProfile(profile);
+      } catch { /* Keep the cached profile available while the backend is offline. */ }
+    }
+
     if (!profile) {
       profile = UserStore.initializeNewUser(targetId, '', 'Athlete');
     }
@@ -195,6 +220,17 @@ export const AuthService = {
       updatedAt: new Date().toISOString(),
     };
 
+    if (BackendApi.hasAuthToken()) {
+      await BackendApi.updateProfile({
+        fullName: updated.fullName,
+        avatarUrl: updated.avatarUrl,
+        dateOfBirth: updated.dateOfBirth,
+        gender: updated.gender,
+        country: updated.country,
+        preferredUnits: updated.preferredUnits,
+      });
+    }
+
     UserStore.saveProfile(updated);
     return updated;
   },
@@ -209,5 +245,16 @@ export const AuthService = {
       // Ignore
     }
     currentActiveUserId = null;
+    await BackendApi.signOut();
   },
 };
+
+function ageFromDateOfBirth(value?: string | null): number | undefined {
+  if (!value) return undefined;
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return undefined;
+  const today = new Date();
+  let age = today.getFullYear() - date.getFullYear();
+  if (today.getMonth() < date.getMonth() || (today.getMonth() === date.getMonth() && today.getDate() < date.getDate())) age -= 1;
+  return age >= 0 ? age : undefined;
+}

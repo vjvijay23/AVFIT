@@ -8,6 +8,7 @@ import {
 import { supabase } from './supabase';
 import { UserStore } from './userStore';
 import { AuthService } from './auth';
+import { BackendApi } from './backendApi';
 
 export const ACHIEVEMENT_CATALOG: AchievementDefinition[] = [
   // --- Category A: Step and Activity Achievements ---
@@ -414,6 +415,27 @@ export const AchievementService = {
    */
   async getAllUserAchievements(userId?: string): Promise<UserAchievement[]> {
     const targetUserId = userId || AuthService.getActiveUserId();
+    if (BackendApi.hasAuthToken()) {
+      const response = await BackendApi.getMyAchievements();
+      const list = response.achievements.map((row) => {
+        const definition = toAchievementDefinition(row);
+        return {
+          id: String(row.user_achievement_id || `uach_${targetUserId}_${row.id}`),
+          userId: targetUserId,
+          achievementId: definition.id,
+          achievement: definition,
+          currentValue: Number(row.current_value || 0),
+          targetValue: Number(row.target_value || definition.targetValue),
+          progressPercent: Number(row.progress_percent || 0),
+          isUnlocked: Boolean(row.is_unlocked),
+          unlockedAt: row.unlocked_at || undefined,
+          isShared: Boolean(row.is_shared),
+        } satisfies UserAchievement;
+      });
+      const userAchs = UserStore.getUserAchievements(targetUserId);
+      list.forEach((item) => { userAchs[item.achievementId] = item; });
+      return list;
+    }
     const userAchs = UserStore.getUserAchievements(targetUserId);
 
     return ACHIEVEMENT_CATALOG.map((def) => {
@@ -443,6 +465,27 @@ export const AchievementService = {
    */
   async getTrophySummary(userId?: string): Promise<TrophySummary> {
     const targetUserId = userId || AuthService.getActiveUserId();
+    if (BackendApi.hasAuthToken()) {
+      const response = await BackendApi.getMyAchievements();
+      const achievements = response.achievements.map((row) => ({
+        id: String(row.user_achievement_id || `uach_${targetUserId}_${row.id}`), userId: targetUserId,
+        achievementId: String(row.id), achievement: toAchievementDefinition(row),
+        currentValue: Number(row.current_value || 0), targetValue: Number(row.target_value || 0),
+        progressPercent: Number(row.progress_percent || 0), isUnlocked: Boolean(row.is_unlocked),
+        unlockedAt: row.unlocked_at || undefined, isShared: Boolean(row.is_shared),
+      } satisfies UserAchievement));
+      const summary = response.summary;
+      const unlocked = achievements.filter((item) => item.isUnlocked);
+      const locked = achievements.filter((item) => !item.isUnlocked).sort((a, b) => b.progressPercent - a.progressPercent);
+      return {
+        totalTrophies: Number(summary.totalTrophies ?? achievements.length),
+        unlockedCount: Number(summary.unlockedCount ?? unlocked.length),
+        totalPoints: Number(summary.totalPoints || 0),
+        byTier: summary.byTier || { bronze: 0, silver: 0, gold: 0, platinum: 0, diamond: 0 },
+        recentUnlocks: unlocked.sort((a, b) => new Date(b.unlockedAt || '').getTime() - new Date(a.unlockedAt || '').getTime()).slice(0, 3),
+        nextMilestone: locked[0],
+      };
+    }
     const all = await this.getAllUserAchievements(targetUserId);
     const unlocked = all.filter((a) => a.isUnlocked);
 
@@ -579,9 +622,25 @@ export const AchievementService = {
     const userAchs = UserStore.getUserAchievements(targetUserId);
     const record = userAchs[achievementId];
     if (record && record.isUnlocked) {
+      if (BackendApi.hasAuthToken() && record.achievement) {
+        await BackendApi.createCommunityPost(`I unlocked ${record.achievement.title}! ${record.achievement.description}`, 'public');
+      }
       record.isShared = true;
       return true;
     }
     return false;
   },
 };
+
+function toAchievementDefinition(row: Record<string, any>): AchievementDefinition {
+  const metricTypes: Record<string, AchievementDefinition['metricType']> = {
+    steps: 'steps', streak_days: 'streak_days', workout_count: 'workout_count',
+    food_log_days: 'food_log_days', meal_count: 'food_log_days', meal_days: 'food_log_days',
+    community_posts: 'community_posts', post_count: 'community_posts', distance_km: 'distance_km',
+  };
+  return {
+    id: String(row.id), code: String(row.code), title: String(row.title), description: String(row.description || ''),
+    category: row.category, tier: row.tier, iconName: String(row.icon_name || 'Award'),
+    metricType: metricTypes[row.metric_type] || 'workout_count', targetValue: Number(row.target_value || 0), points: Number(row.points || 0),
+  };
+}

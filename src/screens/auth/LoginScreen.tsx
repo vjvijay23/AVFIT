@@ -72,6 +72,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           phone: fullPhone,
           countryCode: selectedCountry.code,
           authMode: 'login',
+          ...(response.developmentOtp ? { developmentOtp: response.developmentOtp } : {}),
         });
       }
     } catch (err: any) {
