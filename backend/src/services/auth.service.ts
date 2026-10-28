@@ -207,12 +207,20 @@ async function msg91VerifyAccessToken(accessToken: string): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const response = await fetch('https://control.msg91.com/api/v5/widget/verifyAccessToken', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ authkey: msg91AuthKey, 'access-token': accessToken }),
-      signal: controller.signal,
-    });
+    let response: Response;
+    try {
+      response = await fetch('https://control.msg91.com/api/v5/widget/verifyAccessToken', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ authkey: msg91AuthKey, 'access-token': accessToken }),
+        signal: controller.signal,
+      });
+    } catch {
+      // Only transport errors and timeouts should be reported as unreachable.
+      // Keep MSG91's HTTP/body validation errors below so the route can return
+      // the correct invalid-code or configuration response to the app.
+      throw new Error('Could not reach MSG91 verification. Please try again shortly.');
+    }
     const result = await response.json().catch(() => ({})) as { type?: string; message?: string; code?: string | number };
     // MSG91 can return HTTP 200 with an error payload, so check the body too.
     if (!response.ok || result.type !== 'success' || typeof result.message !== 'string') {
@@ -225,9 +233,6 @@ async function msg91VerifyAccessToken(accessToken: string): Promise<string> {
       throw new Error('MSG91 could not validate this verification. Check the widget and account configuration, then try again.');
     }
     return result.message;
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith('MSG91 ')) throw error;
-    throw new Error('Could not reach MSG91 verification. Please try again shortly.');
   } finally {
     clearTimeout(timeout);
   }
