@@ -100,7 +100,9 @@ CREATE TABLE IF NOT EXISTS fitness_profiles (
     preferred_workout_duration_min INT NOT NULL DEFAULT 30 CHECK (preferred_workout_duration_min BETWEEN 10 AND 180),
     weekly_workout_frequency_days INT NOT NULL DEFAULT 4 CHECK (weekly_workout_frequency_days BETWEEN 1 AND 7),
     dietary_preference TEXT NOT NULL DEFAULT 'non_vegetarian' CHECK (dietary_preference IN ('non_vegetarian','vegetarian','vegan','pescatarian','keto','halal','other')),
+    dietary_preference_other TEXT NOT NULL DEFAULT '',
     allergies_and_restrictions TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+    custom_allergies_and_restrictions TEXT NOT NULL DEFAULT '',
     bmr NUMERIC(7,1) NOT NULL,
     tdee NUMERIC(7,1) NOT NULL,
     daily_calorie_target INT NOT NULL,
@@ -112,6 +114,9 @@ CREATE TABLE IF NOT EXISTS fitness_profiles (
     is_private BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE fitness_profiles ADD COLUMN IF NOT EXISTS dietary_preference_other TEXT NOT NULL DEFAULT '';
+ALTER TABLE fitness_profiles ADD COLUMN IF NOT EXISTS custom_allergies_and_restrictions TEXT NOT NULL DEFAULT '';
 
 -- Curated workout catalog and completion history.
 CREATE TABLE IF NOT EXISTS workouts (

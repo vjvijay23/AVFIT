@@ -9,6 +9,9 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://avfit-api.onrender.com/api/v1"
+      },
       "android": {
         "buildType": "apk"
       }

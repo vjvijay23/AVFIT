@@ -90,7 +90,9 @@ export interface FitnessProfile {
   preferredWorkoutDurationMin: number; // e.g. 15, 30, 45, 60
   weeklyWorkoutFrequencyDays: number; // e.g. 3, 4, 5
   dietaryPreference: DietaryPreference;
+  dietaryPreferenceOther?: string;
   allergiesAndRestrictions: string[]; // e.g. ['peanuts', 'gluten', 'dairy', 'lactose']
+  customAllergiesAndRestrictions?: string;
   
   // Calculated Metrics (Mifflin-St Jeor & TDEE)
   bmr: number;

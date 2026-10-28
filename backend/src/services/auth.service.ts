@@ -12,6 +12,10 @@ export interface UserProfileData {
   phone: string;
   fullName: string;
   avatarUrl?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  country?: string | null;
+  preferredUnits?: string | null;
   streakCount: number;
   isOnboarded: boolean;
   isNewUser: boolean;
@@ -59,7 +63,12 @@ export class AuthService {
   /**
    * Verify OTP and return or create user profile
    */
-  static async verifyOtp(phone: string, otp: string, fullName?: string): Promise<UserProfileData> {
+  static async verifyOtp(
+    phone: string,
+    otp: string,
+    profile: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string } = {},
+    authMode: 'login' | 'signup' = 'signup'
+  ): Promise<UserProfileData> {
     const cleanPhone = normalizePhone(phone);
     if (typeof otp !== 'string' || !/^\d{6}$/.test(otp)) throw new Error('Enter the 6-digit verification code sent to your phone.');
     if (config.otpProvider === 'mock') {
@@ -90,21 +99,46 @@ export class AuthService {
         phone: user.phone,
         fullName: user.full_name,
         avatarUrl: user.avatar_url,
+        dateOfBirth: user.date_of_birth,
+        gender: user.gender,
+        country: user.country,
+        preferredUnits: user.preferred_units,
         streakCount: user.streak_count || 0,
         isOnboarded: Boolean(user.is_onboarded),
         isNewUser: false,
       };
     }
 
+    if (authMode === 'login') {
+      throw new Error('No account is registered with this phone number. Create an account first.');
+    }
+
+    const fullName = profile.fullName?.trim();
+    if (!fullName || fullName.length > 100) throw new Error('Enter a valid full name to create your account.');
+    const birthDate = profile.dateOfBirth ? new Date(`${profile.dateOfBirth}T00:00:00Z`) : null;
+    const age = birthDate && !Number.isNaN(birthDate.getTime())
+      ? Math.floor((Date.now() - birthDate.getTime()) / 31557600000)
+      : 0;
+    if (!profile.dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(profile.dateOfBirth) || !birthDate || Number.isNaN(birthDate.getTime()) || birthDate.toISOString().slice(0, 10) !== profile.dateOfBirth || age < 13 || age > 100) {
+      throw new Error('Enter a valid date of birth to create your account.');
+    }
+    if (!['male', 'female', 'non_binary', 'prefer_not_to_say'].includes(profile.gender || '')) {
+      throw new Error('Select a valid gender to create your account.');
+    }
+
     // Create new profile
     const insertQuery = `
-      INSERT INTO profiles (phone, full_name, streak_count)
-      VALUES ($1, $2, 0)
+      INSERT INTO profiles (phone, full_name, date_of_birth, gender, avatar_url, country, streak_count)
+      VALUES ($1, $2, $3, $4, $5, $6, 0)
       RETURNING *;
     `;
     const newProfile = await pool.query(insertQuery, [
       cleanPhone,
-      fullName || 'FitPulse Athlete',
+      fullName,
+      profile.dateOfBirth,
+      profile.gender,
+      profile.avatarUrl || null,
+      profile.country || 'US',
     ]);
 
     const user = newProfile.rows[0];
@@ -113,6 +147,10 @@ export class AuthService {
       phone: user.phone,
       fullName: user.full_name,
       avatarUrl: user.avatar_url,
+      dateOfBirth: user.date_of_birth,
+      gender: user.gender,
+      country: user.country,
+      preferredUnits: user.preferred_units,
       streakCount: user.streak_count,
       isOnboarded: Boolean(user.is_onboarded),
       isNewUser: true,
@@ -128,6 +166,10 @@ export class AuthService {
       phone: user.phone,
       fullName: user.full_name,
       avatarUrl: user.avatar_url,
+      dateOfBirth: user.date_of_birth,
+      gender: user.gender,
+      country: user.country,
+      preferredUnits: user.preferred_units,
       streakCount: user.streak_count || 0,
       isOnboarded: Boolean(user.is_onboarded),
       isNewUser: false,

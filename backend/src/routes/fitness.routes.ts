@@ -28,6 +28,20 @@ export async function fitnessRoutes(app: FastifyInstance) {
     for (const [key, allowed] of Object.entries(enumValues)) {
       if (body[key] !== undefined && !allowed.includes(body[key])) return reply.status(400).send({ error: `Invalid ${key}.` });
     }
+    if (body.allergiesAndRestrictions !== undefined && (!Array.isArray(body.allergiesAndRestrictions) || body.allergiesAndRestrictions.some((item: unknown) => typeof item !== 'string' || item.length > 100))) {
+      return reply.status(400).send({ error: 'allergiesAndRestrictions must be an array of text values up to 100 characters.' });
+    }
+    for (const key of ['dietaryPreferenceOther', 'customAllergiesAndRestrictions']) {
+      if (body[key] !== undefined && (typeof body[key] !== 'string' || body[key].length > 500)) {
+        return reply.status(400).send({ error: `${key} must be text up to 500 characters.` });
+      }
+    }
+    if (body.dietaryPreference === 'other' && !String(body.dietaryPreferenceOther || '').trim()) {
+      return reply.status(400).send({ error: 'Describe the other dietary preference.' });
+    }
+    if ((body.allergiesAndRestrictions || []).includes('other') && !String(body.customAllergiesAndRestrictions || '').trim()) {
+      return reply.status(400).send({ error: 'Describe the other food allergy or restriction.' });
+    }
     const profile = await pool.query('SELECT gender,date_of_birth FROM profiles WHERE id=$1', [userId]);
     if (!profile.rows[0]) return reply.status(404).send({ error: 'Profile not found.' });
     const dob = profile.rows[0].date_of_birth ? new Date(profile.rows[0].date_of_birth) : null;
@@ -40,17 +54,18 @@ export async function fitnessRoutes(app: FastifyInstance) {
     const protein = Math.round(weight * 2);
     const fat = Math.round(calorieTarget * 0.25 / 9);
     const carbs = Math.max(0, Math.round((calorieTarget - protein * 4 - fat * 9) / 4));
-    const params = [userId, height, weight, body.targetWeightKg ?? null, body.fitnessGoal || 'general_fitness', body.fitnessLevel || 'beginner', body.activityLevel || 'moderately_active', body.workoutPreference || 'home', body.availableEquipment || ['bodyweight'], body.preferredWorkoutDurationMin || 30, body.weeklyWorkoutFrequencyDays || 4, body.dietaryPreference || 'non_vegetarian', body.allergiesAndRestrictions || [], bmr, tdee, calorieTarget, protein, carbs, fat, body.dailyStepGoal || 10000, Math.round(weight * 35 + 500), body.isPrivate !== false];
+    const params = [userId, height, weight, body.targetWeightKg ?? null, body.fitnessGoal || 'general_fitness', body.fitnessLevel || 'beginner', body.activityLevel || 'moderately_active', body.workoutPreference || 'home', body.availableEquipment || ['bodyweight'], body.preferredWorkoutDurationMin || 30, body.weeklyWorkoutFrequencyDays || 4, body.dietaryPreference || 'non_vegetarian', body.dietaryPreferenceOther || '', body.allergiesAndRestrictions || [], body.customAllergiesAndRestrictions || '', bmr, tdee, calorieTarget, protein, carbs, fat, body.dailyStepGoal || 10000, Math.round(weight * 35 + 500), body.isPrivate !== false];
     const result = await pool.query(`INSERT INTO fitness_profiles (
       user_id,height_cm,weight_kg,target_weight_kg,fitness_goal,fitness_level,activity_level,workout_preference,available_equipment,
-      preferred_workout_duration_min,weekly_workout_frequency_days,dietary_preference,allergies_and_restrictions,bmr,tdee,
+      preferred_workout_duration_min,weekly_workout_frequency_days,dietary_preference,dietary_preference_other,allergies_and_restrictions,custom_allergies_and_restrictions,bmr,tdee,
       daily_calorie_target,daily_protein_g,daily_carbs_g,daily_fat_g,daily_step_goal,daily_water_ml,is_private)
       VALUES (${params.map((_,i)=>`$${i+1}`).join(',')})
       ON CONFLICT(user_id) DO UPDATE SET height_cm=EXCLUDED.height_cm,weight_kg=EXCLUDED.weight_kg,target_weight_kg=EXCLUDED.target_weight_kg,
       fitness_goal=EXCLUDED.fitness_goal,fitness_level=EXCLUDED.fitness_level,activity_level=EXCLUDED.activity_level,workout_preference=EXCLUDED.workout_preference,
       available_equipment=EXCLUDED.available_equipment,preferred_workout_duration_min=EXCLUDED.preferred_workout_duration_min,
       weekly_workout_frequency_days=EXCLUDED.weekly_workout_frequency_days,dietary_preference=EXCLUDED.dietary_preference,
-      allergies_and_restrictions=EXCLUDED.allergies_and_restrictions,bmr=EXCLUDED.bmr,tdee=EXCLUDED.tdee,daily_calorie_target=EXCLUDED.daily_calorie_target,
+      dietary_preference_other=EXCLUDED.dietary_preference_other,allergies_and_restrictions=EXCLUDED.allergies_and_restrictions,
+      custom_allergies_and_restrictions=EXCLUDED.custom_allergies_and_restrictions,bmr=EXCLUDED.bmr,tdee=EXCLUDED.tdee,daily_calorie_target=EXCLUDED.daily_calorie_target,
       daily_protein_g=EXCLUDED.daily_protein_g,daily_carbs_g=EXCLUDED.daily_carbs_g,daily_fat_g=EXCLUDED.daily_fat_g,
       daily_step_goal=EXCLUDED.daily_step_goal,daily_water_ml=EXCLUDED.daily_water_ml,is_private=EXCLUDED.is_private,updated_at=NOW() RETURNING *`, params);
     await pool.query('UPDATE profiles SET is_onboarded=TRUE, updated_at=NOW() WHERE id=$1', [userId]);

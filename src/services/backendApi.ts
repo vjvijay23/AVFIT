@@ -1,9 +1,8 @@
-import { Platform } from 'react-native';
 import { FoodNutritionEstimate, GPSPoint } from '../types';
 
-// Set EXPO_PUBLIC_API_URL for physical devices. Android emulators reach the host via 10.0.2.2.
-const DEFAULT_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || `http://${DEFAULT_HOST}:5000/api/v1`).replace(/\/$/, '');
+// Point the app at the deployed API by default. Set EXPO_PUBLIC_API_URL to a local
+// backend URL when developing against a local server (Android emulator: 10.0.2.2).
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://avfit-api.onrender.com/api/v1').replace(/\/$/, '');
 let authToken: string | null = null;
 
 type RequestOptions = RequestInit & { authenticated?: boolean };
@@ -32,9 +31,9 @@ export const BackendApi = {
       method: 'POST', authenticated: false, body: JSON.stringify({ phone }),
     });
   },
-  async verifyOtp(phone: string, otp: string, fullName?: string) {
-    const result = await apiRequest<{ success: boolean; token: string; user: { id: string; phone: string; fullName: string; avatarUrl?: string | null; streakCount: number; isOnboarded?: boolean; isNewUser?: boolean } }>('/auth/otp/verify', {
-      method: 'POST', authenticated: false, body: JSON.stringify({ phone, otp, fullName }),
+  async verifyOtp(phone: string, otp: string, profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string }, authMode: 'login' | 'signup' = 'login') {
+    const result = await apiRequest<{ success: boolean; token: string; user: { id: string; phone: string; fullName: string; avatarUrl?: string | null; dateOfBirth?: string | null; gender?: string | null; country?: string | null; preferredUnits?: string | null; streakCount: number; isOnboarded?: boolean; isNewUser?: boolean } }>('/auth/otp/verify', {
+      method: 'POST', authenticated: false, body: JSON.stringify({ phone, otp, profile, authMode }),
     });
     authToken = result.token;
     return result;

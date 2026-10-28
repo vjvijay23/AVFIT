@@ -50,7 +50,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [selectedCountry, setSelectedCountry] = useState(COUNTRY_CODES[1]); // Default India +91 or +1
   const [phoneNumber, setPhoneNumber] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
-  const [gender, setGender] = useState<Gender>('male');
+  const [gender, setGender] = useState<Gender>('prefer_not_to_say');
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_OPTIONS[0]);
   const [agreedToTerms, setAgreedToTerms] = useState(true);
 
@@ -70,6 +70,16 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
     if (!cleanPhone || cleanPhone.length < 8) {
       setErrorMessage('Please enter a valid mobile phone number (8-10 digits).');
+      return;
+    }
+
+    const birthDate = new Date(`${dateOfBirth}T00:00:00Z`);
+    const age = new Date().getFullYear() - birthDate.getFullYear() - (
+      new Date().getMonth() < birthDate.getMonth() ||
+      (new Date().getMonth() === birthDate.getMonth() && new Date().getDate() < birthDate.getDate()) ? 1 : 0
+    );
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) || Number.isNaN(birthDate.getTime()) || birthDate.toISOString().slice(0, 10) !== dateOfBirth || age < 13 || age > 100) {
+      setErrorMessage('Enter a valid birth date. You must be between 13 and 100 years old.');
       return;
     }
 
@@ -96,7 +106,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           fullName: fullName.trim(),
           phone: fullPhone,
           countryCode: selectedCountry.code,
-          dateOfBirth: dateOfBirth || '1998-05-12',
+          dateOfBirth,
           gender,
           avatarUrl: selectedAvatar,
           country: selectedCountry.name,
@@ -247,7 +257,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           {/* Date of Birth & Gender Row */}
           <View style={styles.row}>
             <View style={styles.halfCol}>
-              <Text style={styles.inputLabel}>Birth Date (Optional)</Text>
+              <Text style={styles.inputLabel}>Birth Date</Text>
               <View style={styles.inputContainer}>
                 <Calendar size={16} color={Colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
@@ -286,6 +296,14 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
                 >
                   <Text style={[styles.miniChipText, gender === 'non_binary' && styles.miniChipTextActive]}>
                     Other
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.miniChip, gender === 'prefer_not_to_say' && styles.miniChipActive]}
+                  onPress={() => setGender('prefer_not_to_say')}
+                >
+                  <Text style={[styles.miniChipText, gender === 'prefer_not_to_say' && styles.miniChipTextActive]}>
+                    Skip
                   </Text>
                 </TouchableOpacity>
               </View>

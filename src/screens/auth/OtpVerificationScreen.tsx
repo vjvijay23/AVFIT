@@ -127,7 +127,7 @@ export default function OtpVerificationScreen({
         if (onVerifiedSuccess) {
           onVerifiedSuccess(result.isNewUser);
         } else if (navigation?.replace) {
-          if (authMode === 'signup' || result.isNewUser || !result.user.isOnboarded) {
+          if (result.isNewUser || !result.user.isOnboarded) {
             navigation.replace('FitnessOnboarding');
           } else {
             navigation.replace('Main');

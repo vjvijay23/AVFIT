@@ -69,36 +69,31 @@ export const AuthService = {
       throw new Error('Please enter the complete 6-digit verification code.');
     }
 
-    const response = await BackendApi.verifyOtp(phone, cleanToken, pendingProfile?.fullName);
+    const response = await BackendApi.verifyOtp(phone, cleanToken, pendingProfile, authMode);
     const isNewUser = response.user.isNewUser ?? authMode === 'signup';
     const userId = response.user.id;
     currentActiveUserId = userId;
     phoneToUserIdMap[phone] = userId;
-    if (pendingProfile) {
-      await BackendApi.updateProfile({
-        fullName: pendingProfile.fullName,
-        avatarUrl: pendingProfile.avatarUrl,
-        dateOfBirth: pendingProfile.dateOfBirth,
-        gender: pendingProfile.gender,
-        country: pendingProfile.country,
-      });
-    }
-
     const existing = UserStore.getProfile(userId);
     const profile = existing || UserStore.initializeNewUser(
       userId,
       response.user.phone,
       response.user.fullName || pendingProfile?.fullName || 'New Athlete',
-      pendingProfile?.country || 'United States',
+      response.user.country || pendingProfile?.country || 'United States',
       response.user.avatarUrl || pendingProfile?.avatarUrl || '🏃‍♂️',
-      pendingProfile?.dateOfBirth,
-      pendingProfile?.gender
+      response.user.dateOfBirth || pendingProfile?.dateOfBirth,
+      (response.user.gender || pendingProfile?.gender) as Gender | undefined
     );
     const normalizedProfile = await this.saveUserProfile({
       ...profile,
       phone: response.user.phone,
       fullName: response.user.fullName || profile.fullName,
       avatarUrl: response.user.avatarUrl || profile.avatarUrl,
+      dateOfBirth: response.user.dateOfBirth || profile.dateOfBirth,
+      age: ageFromDateOfBirth(response.user.dateOfBirth || profile.dateOfBirth) || profile.age,
+      gender: (response.user.gender || profile.gender) as Gender | undefined,
+      country: response.user.country || profile.country,
+      preferredUnits: (response.user.preferredUnits || profile.preferredUnits) as UserProfile['preferredUnits'],
       streakCount: response.user.streakCount || 0,
       isOnboarded: response.user.isOnboarded ?? profile.isOnboarded,
     });
@@ -170,6 +165,7 @@ export const AuthService = {
           ...(profile || UserStore.initializeNewUser(targetId, row.phone || '', row.full_name || 'Athlete')),
           id: String(row.id), phone: row.phone || '', fullName: row.full_name || profile?.fullName || 'Athlete',
           avatarUrl: row.avatar_url || undefined, dateOfBirth: row.date_of_birth || undefined,
+          age: ageFromDateOfBirth(row.date_of_birth) || profile?.age,
           gender: row.gender || undefined, country: row.country || 'United States',
           preferredUnits: row.preferred_units || 'metric', isOnboarded: Boolean(row.is_onboarded),
           streakCount: Number(row.streak_count || 0), totalPoints: Number(row.total_trophy_points || 0),
@@ -228,3 +224,13 @@ export const AuthService = {
     await BackendApi.signOut();
   },
 };
+
+function ageFromDateOfBirth(value?: string | null): number | undefined {
+  if (!value) return undefined;
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return undefined;
+  const today = new Date();
+  let age = today.getFullYear() - date.getFullYear();
+  if (today.getMonth() < date.getMonth() || (today.getMonth() === date.getMonth() && today.getDate() < date.getDate())) age -= 1;
+  return age >= 0 ? age : undefined;
+}

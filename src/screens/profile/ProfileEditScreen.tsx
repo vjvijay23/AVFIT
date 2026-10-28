@@ -52,7 +52,7 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
   // Form states
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [age, setAge] = useState('28');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [gender, setGender] = useState<Gender>('male');
   const [heightCm, setHeightCm] = useState('178');
   const [weightKg, setWeightKg] = useState('74');
@@ -61,6 +61,13 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>('moderately_active');
   const [workoutPreference, setWorkoutPreference] = useState<WorkoutPreference>('combination');
   const [dietaryPreference, setDietaryPreference] = useState<DietaryPreference>('non_vegetarian');
+  const [dietaryPreferenceOther, setDietaryPreferenceOther] = useState('');
+  const [allergies, setAllergies] = useState<string[]>(['none']);
+  const [customAllergiesAndRestrictions, setCustomAllergiesAndRestrictions] = useState('');
+  const [fitnessLevel, setFitnessLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
+  const [availableEquipment, setAvailableEquipment] = useState<string[]>(['bodyweight']);
+  const [preferredDurationMin, setPreferredDurationMin] = useState(30);
+  const [weeklyFrequencyDays, setWeeklyFrequencyDays] = useState(4);
   const [isPrivate, setIsPrivate] = useState(true);
 
   useEffect(() => {
@@ -71,8 +78,8 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
 
         setFullName(user.fullName || 'Alex Vance');
         setPhone(user.phone || '');
-        setAge(user.age?.toString() || '28');
-        setGender(user.gender || 'male');
+        setDateOfBirth(user.dateOfBirth?.slice(0, 10) || '');
+        setGender(user.gender || 'prefer_not_to_say');
 
         setHeightCm(fitness.heightCm.toString());
         setWeightKg(fitness.weightKg.toString());
@@ -81,6 +88,13 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
         setActivityLevel(fitness.activityLevel);
         setWorkoutPreference(fitness.workoutPreference);
         setDietaryPreference(fitness.dietaryPreference);
+        setDietaryPreferenceOther(fitness.dietaryPreferenceOther || '');
+        setAllergies(fitness.allergiesAndRestrictions.length ? fitness.allergiesAndRestrictions : ['none']);
+        setCustomAllergiesAndRestrictions(fitness.customAllergiesAndRestrictions || '');
+        setFitnessLevel(fitness.fitnessLevel);
+        setAvailableEquipment(fitness.availableEquipment);
+        setPreferredDurationMin(fitness.preferredWorkoutDurationMin);
+        setWeeklyFrequencyDays(fitness.weeklyWorkoutFrequencyDays);
         setIsPrivate(fitness.isPrivate);
       } catch (e) {
         // Fallback
@@ -94,7 +108,7 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
   // Live Mifflin-St Jeor Calculation
   const parsedWeight = parseFloat(weightKg) || 70;
   const parsedHeight = parseFloat(heightCm) || 175;
-  const parsedAge = parseInt(age, 10) || 28;
+  const parsedAge = ageFromDateOfBirth(dateOfBirth) || 30;
 
   const liveBmr = FitnessProfileService.calculateBMR(parsedWeight, parsedHeight, parsedAge, gender);
   const liveTdee = FitnessProfileService.calculateTDEE(liveBmr, activityLevel);
@@ -105,30 +119,63 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
     gender
   );
 
+  const toggleAllergy = (item: string) => {
+    if (item === 'none') {
+      setAllergies(['none']);
+      return;
+    }
+    const selected = allergies.filter((value) => value !== 'none');
+    if (selected.includes(item)) {
+      const next = selected.filter((value) => value !== item);
+      setAllergies(next.length ? next : ['none']);
+    } else {
+      setAllergies([...selected, item]);
+    }
+  };
+
   const handleSave = async () => {
+    if (!fullName.trim()) {
+      Alert.alert('Required', 'Please enter your name.');
+      return;
+    }
+    if (dateOfBirth && (!ageFromDateOfBirth(dateOfBirth) || parsedAge < 13 || parsedAge > 100)) {
+      Alert.alert('Invalid birth date', 'Enter a valid date of birth for someone between 13 and 100 years old.');
+      return;
+    }
+    if (dietaryPreference === 'other' && !dietaryPreferenceOther.trim()) {
+      Alert.alert('Dietary preference required', 'Describe your dietary preference.');
+      return;
+    }
+    if (allergies.includes('other') && !customAllergiesAndRestrictions.trim()) {
+      Alert.alert('Restriction required', 'Describe your other food allergy or restriction.');
+      return;
+    }
     setIsSaving(true);
     try {
       await AuthService.saveUserProfile({
         fullName,
+        dateOfBirth: dateOfBirth || undefined,
         age: parsedAge,
         gender,
       });
 
       await FitnessProfileService.saveFitnessProfile(
         {
-          userId: 'usr_vyalwin_001',
+          userId: AuthService.getActiveUserId(),
           heightCm: parsedHeight,
           weightKg: parsedWeight,
           targetWeightKg: parseFloat(targetWeightKg) || undefined,
           fitnessGoal,
-          fitnessLevel: 'intermediate',
+          fitnessLevel,
           activityLevel,
           workoutPreference,
-          availableEquipment: ['dumbbells', 'resistance_bands', 'bodyweight'],
-          preferredWorkoutDurationMin: 30,
-          weeklyWorkoutFrequencyDays: 4,
+          availableEquipment,
+          preferredWorkoutDurationMin: preferredDurationMin,
+          weeklyWorkoutFrequencyDays: weeklyFrequencyDays,
           dietaryPreference,
-          allergiesAndRestrictions: ['none'],
+          dietaryPreferenceOther: dietaryPreference === 'other' ? dietaryPreferenceOther.trim() : '',
+          allergiesAndRestrictions: allergies,
+          customAllergiesAndRestrictions: allergies.includes('other') ? customAllergiesAndRestrictions.trim() : '',
           isPrivate,
         },
         parsedAge,
@@ -246,19 +293,19 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
         <View style={styles.card}>
           <Text style={styles.sectionHeading}>Body Metrics</Text>
 
-          <View style={styles.row}>
-            <View style={styles.half}>
-              <Text style={styles.label}>Age</Text>
-              <TextInput
-                style={styles.input}
-                value={age}
-                onChangeText={setAge}
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={styles.half}>
-              <Text style={styles.label}>Gender</Text>
-              <View style={styles.genderRow}>
+          <View style={{ marginBottom: 12 }}>
+            <Text style={styles.label}>Date of Birth (YYYY-MM-DD)</Text>
+            <TextInput
+              style={styles.input}
+              value={dateOfBirth}
+              onChangeText={setDateOfBirth}
+              placeholder="1990-05-24"
+              autoCapitalize="none"
+            />
+          </View>
+          <View>
+            <Text style={styles.label}>Gender</Text>
+            <View style={styles.genderRow}>
                 <TouchableOpacity
                   style={[styles.chip, gender === 'male' && styles.chipActive]}
                   onPress={() => setGender('male')}
@@ -283,7 +330,14 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
                     Other
                   </Text>
                 </TouchableOpacity>
-              </View>
+                <TouchableOpacity
+                  style={[styles.chip, gender === 'prefer_not_to_say' && styles.chipActive]}
+                  onPress={() => setGender('prefer_not_to_say')}
+                >
+                  <Text style={[styles.chipText, gender === 'prefer_not_to_say' && styles.chipTextActive]}>
+                    Prefer not to say
+                  </Text>
+                </TouchableOpacity>
             </View>
           </View>
 
@@ -371,6 +425,74 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
           </View>
         </View>
 
+        {/* Section: Food Preferences */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeading}>Food Preferences</Text>
+          <Text style={styles.label}>Dietary Preference</Text>
+          <View style={styles.choiceGroup}>
+            {[
+              { id: 'non_vegetarian', label: 'Omnivore / Non-Veg' },
+              { id: 'vegetarian', label: 'Vegetarian' },
+              { id: 'vegan', label: 'Plant-Based / Vegan' },
+              { id: 'pescatarian', label: 'Pescatarian' },
+              { id: 'keto', label: 'Keto / Low-Carb' },
+              { id: 'halal', label: 'Halal' },
+              { id: 'other', label: 'Other' },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.choicePill, dietaryPreference === item.id && styles.choicePillActive]}
+                onPress={() => setDietaryPreference(item.id as DietaryPreference)}
+              >
+                <Text style={[styles.choicePillText, dietaryPreference === item.id && styles.choicePillTextActive]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {dietaryPreference === 'other' && (
+            <TextInput
+              style={styles.input}
+              value={dietaryPreferenceOther}
+              onChangeText={setDietaryPreferenceOther}
+              placeholder="Describe your dietary preference"
+              maxLength={500}
+            />
+          )}
+          <Text style={[styles.label, { marginTop: 14 }]}>Food Allergies & Restrictions</Text>
+          <View style={styles.choiceGroup}>
+            {[
+              { id: 'none', label: 'None' },
+              { id: 'peanuts', label: 'Peanuts' },
+              { id: 'tree_nuts', label: 'Tree Nuts' },
+              { id: 'gluten', label: 'Gluten / Wheat' },
+              { id: 'dairy', label: 'Dairy / Lactose' },
+              { id: 'shellfish', label: 'Shellfish' },
+              { id: 'soy', label: 'Soy' },
+              { id: 'other', label: 'Other' },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.choicePill, allergies.includes(item.id) && styles.choicePillActive]}
+                onPress={() => toggleAllergy(item.id)}
+              >
+                <Text style={[styles.choicePillText, allergies.includes(item.id) && styles.choicePillTextActive]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {allergies.includes('other') && (
+            <TextInput
+              style={styles.input}
+              value={customAllergiesAndRestrictions}
+              onChangeText={setCustomAllergiesAndRestrictions}
+              placeholder="Add other food allergies or restrictions"
+              maxLength={500}
+            />
+          )}
+        </View>
+
         {/* Privacy Toggle */}
         <TouchableOpacity
           style={styles.privacyCard}
@@ -395,6 +517,17 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
       </ScrollView>
     </View>
   );
+}
+
+function ageFromDateOfBirth(value?: string): number | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value.slice(0, 10))) return undefined;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  const birthDate = new Date(Date.UTC(year, month - 1, day));
+  if (birthDate.getUTCFullYear() !== year || birthDate.getUTCMonth() !== month - 1 || birthDate.getUTCDate() !== day) return undefined;
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  if (today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day)) age--;
+  return age >= 0 ? age : undefined;
 }
 
 const styles = StyleSheet.create({

@@ -17,12 +17,12 @@ export async function authRoutes(fastify: FastifyInstance) {
   });
 
   // Verify OTP and return profile + JWT
-  fastify.post<{ Body: { phone: string; otp: string; fullName?: string } }>(
+  fastify.post<{ Body: { phone: string; otp: string; authMode?: 'login' | 'signup'; profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string } } }>(
     '/otp/verify',
     async (request, reply) => {
-      const { phone, otp, fullName } = request.body || {};
+      const { phone, otp, profile, authMode } = request.body || {};
       try {
-        const user = await AuthService.verifyOtp(phone, otp, fullName);
+        const user = await AuthService.verifyOtp(phone, otp, profile, authMode);
         const token = fastify.jwt.sign({ id: user.id, phone: user.phone }, { expiresIn: '7d' });
         return reply.send({
           success: true,

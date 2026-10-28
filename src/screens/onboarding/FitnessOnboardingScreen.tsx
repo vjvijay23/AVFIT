@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -55,15 +55,14 @@ export default function FitnessOnboardingScreen({
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Step 1: Personal Details
-  const [fullName, setFullName] = useState('Alex Vance');
+  // Signup owns personal details; onboarding collects only fitness metrics.
+  const [profileReady, setProfileReady] = useState(false);
   const [age, setAge] = useState('28');
-  const [gender, setGender] = useState<Gender>('male');
+  const [gender, setGender] = useState<Gender>('prefer_not_to_say');
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
   const [heightCm, setHeightCm] = useState('178');
   const [weightKg, setWeightKg] = useState('74');
   const [targetWeightKg, setTargetWeightKg] = useState('71');
-  const [country, setCountry] = useState('United States');
 
   // Step 2: Fitness Goals & Activity
   const [fitnessGoal, setFitnessGoal] = useState<FitnessGoal>('weight_loss');
@@ -80,10 +79,51 @@ export default function FitnessOnboardingScreen({
   const [preferredDurationMin, setPreferredDurationMin] = useState<number>(30);
   const [weeklyFrequencyDays, setWeeklyFrequencyDays] = useState<number>(4);
   const [dietaryPreference, setDietaryPreference] = useState<DietaryPreference>('non_vegetarian');
+  const [dietaryPreferenceOther, setDietaryPreferenceOther] = useState('');
   const [allergies, setAllergies] = useState<string[]>(['none']);
+  const [customAllergiesAndRestrictions, setCustomAllergiesAndRestrictions] = useState('');
 
   // Privacy
   const [isPrivate, setIsPrivate] = useState<boolean>(true);
+
+  useEffect(() => {
+    let active = true;
+    const loadExisting = async () => {
+      try {
+        const [user, fitness] = await Promise.all([
+          AuthService.getUserProfile(),
+          FitnessProfileService.getFitnessProfile().catch(() => null),
+        ]);
+        if (!active) return;
+        setAge(String(user.age || ageFromDateOfBirth(user.dateOfBirth) || 28));
+        setGender(user.gender || 'prefer_not_to_say');
+        setUnitSystem(user.preferredUnits || 'metric');
+        if (fitness) {
+          setHeightCm(String(fitness.heightCm));
+          setWeightKg(String(fitness.weightKg));
+          setTargetWeightKg(fitness.targetWeightKg == null ? '' : String(fitness.targetWeightKg));
+          setFitnessGoal(fitness.fitnessGoal);
+          setFitnessLevel(fitness.fitnessLevel);
+          setActivityLevel(fitness.activityLevel);
+          setWorkoutPreference(fitness.workoutPreference);
+          setAvailableEquipment(fitness.availableEquipment);
+          setPreferredDurationMin(fitness.preferredWorkoutDurationMin);
+          setWeeklyFrequencyDays(fitness.weeklyWorkoutFrequencyDays);
+          setDietaryPreference(fitness.dietaryPreference);
+          setDietaryPreferenceOther(fitness.dietaryPreferenceOther || '');
+          setAllergies(fitness.allergiesAndRestrictions.length ? fitness.allergiesAndRestrictions : ['none']);
+          setCustomAllergiesAndRestrictions(fitness.customAllergiesAndRestrictions || '');
+          setIsPrivate(fitness.isPrivate);
+        }
+      } catch {
+        // Authenticated user details remain available from the session cache.
+      } finally {
+        if (active) setProfileReady(true);
+      }
+    };
+    loadExisting();
+    return () => { active = false; };
+  }, []);
 
   // Toggle helpers
   const toggleEquipment = (item: string) => {
@@ -125,14 +165,6 @@ export default function FitnessOnboardingScreen({
 
   // Validation
   const validateStep1 = () => {
-    if (!fullName.trim()) {
-      Alert.alert('Required', 'Please enter your full name.');
-      return false;
-    }
-    if (!parsedAge || parsedAge < 13 || parsedAge > 100) {
-      Alert.alert('Invalid Age', 'Please enter an age between 13 and 100.');
-      return false;
-    }
     if (!parsedHeight || parsedHeight < 100 || parsedHeight > 250) {
       Alert.alert('Invalid Height', 'Please enter a valid height in cm.');
       return false;
@@ -154,22 +186,24 @@ export default function FitnessOnboardingScreen({
   };
 
   const handleComplete = async () => {
+    if (dietaryPreference === 'other' && !dietaryPreferenceOther.trim()) {
+      Alert.alert('Dietary preference required', 'Describe your dietary preference in step 3.');
+      setCurrentStep(3);
+      return;
+    }
+    if (allergies.includes('other') && !customAllergiesAndRestrictions.trim()) {
+      Alert.alert('Restriction required', 'Describe your other food allergy or restriction in step 3.');
+      setCurrentStep(3);
+      return;
+    }
     setIsSaving(true);
     try {
-      // 1. Save user profile details
-      await AuthService.saveUserProfile({
-        fullName,
-        age: parsedAge,
-        gender,
-        country,
-        preferredUnits: unitSystem,
-        isOnboarded: true,
-      });
-
-      // 2. Save scientific fitness profile
+      const userId = AuthService.getActiveUserId();
+      if (!userId) throw new Error('Your sign-in session expired. Please sign in again.');
+      await AuthService.saveUserProfile({ preferredUnits: unitSystem });
       await FitnessProfileService.saveFitnessProfile(
         {
-          userId: 'usr_vyalwin_001',
+          userId,
           heightCm: parsedHeight,
           weightKg: parsedWeight,
           targetWeightKg: parseFloat(targetWeightKg) || undefined,
@@ -181,7 +215,9 @@ export default function FitnessOnboardingScreen({
           preferredWorkoutDurationMin: preferredDurationMin,
           weeklyWorkoutFrequencyDays: weeklyFrequencyDays,
           dietaryPreference,
+          dietaryPreferenceOther: dietaryPreference === 'other' ? dietaryPreferenceOther.trim() : '',
           allergiesAndRestrictions: allergies,
+          customAllergiesAndRestrictions: allergies.includes('other') ? customAllergiesAndRestrictions.trim() : '',
           isPrivate,
         },
         parsedAge,
@@ -194,12 +230,20 @@ export default function FitnessOnboardingScreen({
         navigation.replace('Main');
       }
     } catch (e) {
-      Alert.alert('Notice', 'Profile saved! Proceeding to Dashboard.');
-      if (navigation?.replace) navigation.replace('Main');
+      Alert.alert('Could not save profile', e instanceof Error ? e.message : 'Please try again. Your profile was not marked complete.');
     } finally {
       setIsSaving(false);
     }
   };
+
+  if (!profileReady) {
+    return (
+      <View style={[styles.container, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.sectionSub}>Loading your account details…</Text>
+      </View>
+    );
+  }
 
   const handleSaveAndExit = async () => {
     // Save draft progress and complete later
@@ -247,65 +291,10 @@ export default function FitnessOnboardingScreen({
             <View style={styles.stepIconCircle}>
               <User size={24} color={Colors.primary} />
             </View>
-            <Text style={styles.sectionHeader}>Tell Us About Yourself</Text>
+            <Text style={styles.sectionHeader}>Set Your Body Metrics</Text>
             <Text style={styles.sectionSub}>
-              We use your biological metrics to calculate precise BMR, energy expenditure, and baseline nutritional requirements.
+              Your name, birth date, and gender came from account creation. Add your fitness measurements to personalize your plan.
             </Text>
-
-            {/* Full Name */}
-            <Text style={styles.fieldLabel}>Full Name</Text>
-            <TextInput
-              style={styles.input}
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="e.g. Alex Vance"
-              placeholderTextColor="#9EA6A0"
-            />
-
-            {/* Age & Gender Row */}
-            <View style={styles.row}>
-              <View style={styles.halfCol}>
-                <Text style={styles.fieldLabel}>Age</Text>
-                <TextInput
-                  style={styles.input}
-                  value={age}
-                  onChangeText={setAge}
-                  keyboardType="numeric"
-                  placeholder="28"
-                  placeholderTextColor="#9EA6A0"
-                />
-              </View>
-
-              <View style={styles.halfCol}>
-                <Text style={styles.fieldLabel}>Gender</Text>
-                <View style={styles.genderRow}>
-                  <TouchableOpacity
-                    style={[styles.miniChip, gender === 'male' && styles.miniChipActive]}
-                    onPress={() => setGender('male')}
-                  >
-                    <Text style={[styles.miniChipText, gender === 'male' && styles.miniChipTextActive]}>
-                      Male
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.miniChip, gender === 'female' && styles.miniChipActive]}
-                    onPress={() => setGender('female')}
-                  >
-                    <Text style={[styles.miniChipText, gender === 'female' && styles.miniChipTextActive]}>
-                      Female
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.miniChip, gender === 'non_binary' && styles.miniChipActive]}
-                    onPress={() => setGender('non_binary')}
-                  >
-                    <Text style={[styles.miniChipText, gender === 'non_binary' && styles.miniChipTextActive]}>
-                      Other
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
 
             {/* Units Toggle */}
             <View style={styles.unitsRow}>
@@ -531,6 +520,7 @@ export default function FitnessOnboardingScreen({
                 { id: 'pescatarian', label: 'Pescatarian' },
                 { id: 'keto', label: 'Keto / Low-Carb' },
                 { id: 'halal', label: 'Halal' },
+                { id: 'other', label: 'Other' },
               ].map((item) => (
                 <TouchableOpacity
                   key={item.id}
@@ -551,6 +541,16 @@ export default function FitnessOnboardingScreen({
                 </TouchableOpacity>
               ))}
             </View>
+            {dietaryPreference === 'other' && (
+              <TextInput
+                style={[styles.input, { marginTop: 10 }]}
+                value={dietaryPreferenceOther}
+                onChangeText={setDietaryPreferenceOther}
+                placeholder="Describe your dietary preference"
+                placeholderTextColor="#9EA6A0"
+                maxLength={500}
+              />
+            )}
 
             {/* Food Allergies */}
             <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
@@ -565,6 +565,7 @@ export default function FitnessOnboardingScreen({
                 { id: 'dairy', label: 'Dairy / Lactose' },
                 { id: 'shellfish', label: 'Shellfish' },
                 { id: 'soy', label: 'Soy' },
+                { id: 'other', label: 'Other' },
               ].map((item) => {
                 const isSelected = allergies.includes(item.id);
                 return (
@@ -586,6 +587,16 @@ export default function FitnessOnboardingScreen({
                 );
               })}
             </View>
+            {allergies.includes('other') && (
+              <TextInput
+                style={[styles.input, { marginTop: 10 }]}
+                value={customAllergiesAndRestrictions}
+                onChangeText={setCustomAllergiesAndRestrictions}
+                placeholder="Add other food allergies or restrictions"
+                placeholderTextColor="#9EA6A0"
+                maxLength={500}
+              />
+            )}
           </View>
         )}
 
@@ -714,6 +725,16 @@ export default function FitnessOnboardingScreen({
       </View>
     </View>
   );
+}
+
+function ageFromDateOfBirth(value?: string): number | undefined {
+  if (!value) return undefined;
+  const birthDate = new Date(`${value.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(birthDate.getTime())) return undefined;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  if (today.getMonth() < birthDate.getMonth() || (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())) age--;
+  return age >= 0 ? age : undefined;
 }
 
 const styles = StyleSheet.create({
