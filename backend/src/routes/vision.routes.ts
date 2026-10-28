@@ -8,7 +8,7 @@ interface ScanFoodBody {
 }
 
 export async function visionRoutes(fastify: FastifyInstance) {
-  // Analyze meal photo with Gemini 1.5/2.0 Flash
+  // Analyze meal photos with the configured Gemini model.
   fastify.post<{ Body: ScanFoodBody }>('/scan-food', { preHandler: requireAuth }, async (request, reply) => {
     const { imageBase64, mimeType } = request.body || {};
 
@@ -30,8 +30,9 @@ export async function visionRoutes(fastify: FastifyInstance) {
       });
     } catch (err: any) {
       request.log.error(err);
-      return reply.status(500).send({
-        error: err.message || 'Failed to analyze food image with Vision AI',
+      const statusCode = (err as Error & { statusCode?: number }).statusCode || 502;
+      return reply.status(statusCode).send({
+        error: statusCode === 503 ? err.message : 'Food photo analysis failed. Please try again shortly.',
       });
     }
   });

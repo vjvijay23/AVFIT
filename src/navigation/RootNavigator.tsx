@@ -28,6 +28,7 @@ import OtpVerificationScreen from '../screens/auth/OtpVerificationScreen';
 import FitnessOnboardingScreen from '../screens/onboarding/FitnessOnboardingScreen';
 import AchievementsScreen from '../screens/achievements/AchievementsScreen';
 import ProfileEditScreen from '../screens/profile/ProfileEditScreen';
+import DietPlanScreen from '../screens/DietPlanScreen';
 import RecordActivityScreen from '../screens/activity/RecordActivityScreen';
 import ActivitySummaryScreen from '../screens/activity/ActivitySummaryScreen';
 import { LiveWalkingAnalyzerScreen } from '../modules/walking-analyzer';
@@ -165,6 +166,7 @@ export default function RootNavigator() {
 
       {/* Fitness Profile & Target Editor */}
       <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+      <Stack.Screen name="DietPlan" component={DietPlanScreen} />
 
       {/* Historical Activity Tracker */}
       <Stack.Screen name="ActivityHistory" component={ActivityTrackerScreen} />

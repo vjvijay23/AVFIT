@@ -20,8 +20,8 @@ export async function mealRoutes(app: FastifyInstance) {
     const mealType = body.mealType || 'lunch';
     if (!allowedMeals.includes(mealType)) return reply.status(400).send({ error: 'mealType must be breakfast, lunch, dinner, or snack.' });
     const userId = authenticatedUserId(request);
-    const result = await pool.query(`INSERT INTO meals (user_id,dish_name,portion_grams,calories,protein_g,carbs_g,fat_g,fiber_g,confidence,health_tips,ingredients,meal_type)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`, [userId,name,body.portionGrams ?? 250,calories,body.proteinG ?? 0,body.carbsG ?? 0,body.fatG ?? 0,body.fiberG ?? 0,body.confidence || 'manual',body.healthTips || null,JSON.stringify(body.ingredients || []),mealType]);
+    const result = await pool.query(`INSERT INTO meals (user_id,dish_name,portion_grams,calories,protein_g,carbs_g,fat_g,fiber_g,sugars_g,saturated_fat_g,sodium_mg,cholesterol_mg,confidence,health_tips,ingredients,meal_type)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`, [userId,name,body.portionGrams ?? 250,calories,body.proteinG ?? 0,body.carbsG ?? 0,body.fatG ?? 0,body.fiberG ?? 0,body.sugarsG ?? 0,body.saturatedFatG ?? 0,body.sodiumMg ?? 0,body.cholesterolMg ?? 0,body.confidence || 'manual',body.healthTips || null,JSON.stringify(body.ingredients || []),mealType]);
     const count = await pool.query('SELECT COUNT(*)::int count FROM meals WHERE user_id=$1', [userId]);
     const newlyUnlocked = await AchievementService.updateMetric(userId, 'meal_count', count.rows[0].count);
     const mealDays = await pool.query('SELECT COUNT(DISTINCT logged_at::date)::int count FROM meals WHERE user_id=$1', [userId]);
@@ -34,7 +34,8 @@ export async function mealRoutes(app: FastifyInstance) {
     const body = request.body || {};
     const fields: Record<string, [string, unknown]> = {
       dishName: ['dish_name', body.dishName], portionGrams: ['portion_grams', body.portionGrams], calories: ['calories', body.calories],
-      proteinG: ['protein_g', body.proteinG], carbsG: ['carbs_g', body.carbsG], fatG: ['fat_g', body.fatG], fiberG: ['fiber_g', body.fiberG], mealType: ['meal_type', body.mealType],
+      proteinG: ['protein_g', body.proteinG], carbsG: ['carbs_g', body.carbsG], fatG: ['fat_g', body.fatG], fiberG: ['fiber_g', body.fiberG],
+      sugarsG: ['sugars_g', body.sugarsG], saturatedFatG: ['saturated_fat_g', body.saturatedFatG], sodiumMg: ['sodium_mg', body.sodiumMg], cholesterolMg: ['cholesterol_mg', body.cholesterolMg], mealType: ['meal_type', body.mealType],
     };
     const updates = Object.values(fields).filter(([,value]) => value !== undefined);
     if (!updates.length) return reply.status(400).send({ error: 'Provide at least one meal field to update.' });

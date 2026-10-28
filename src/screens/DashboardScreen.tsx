@@ -203,6 +203,9 @@ export default function DashboardScreen({ navigation }: any) {
               <Text style={styles.nutritionPillText}>{proteinTarget}g Protein</Text>
             </View>
           </View>
+          <TouchableOpacity onPress={() => navigation?.navigate?.('DietPlan')} style={{ marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderSubtle }}>
+            <Text style={{ color: Colors.primary, fontSize: 13, fontWeight: '800' }}>Generate a personalized 7-day diet plan →</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Gamified Achievements & Trophy Room Card */}

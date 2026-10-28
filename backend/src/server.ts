@@ -16,6 +16,7 @@ import { mealRoutes } from './routes/meal.routes.js';
 import { workoutRoutes } from './routes/workout.routes.js';
 import { achievementRoutes } from './routes/achievement.routes.js';
 import { communityRoutes } from './routes/community.routes.js';
+import { dietPlanRoutes } from './routes/diet-plan.routes.js';
 import { pool, redis } from './db/index.js';
 
 export async function buildApp() {
@@ -83,6 +84,7 @@ export async function buildApp() {
   await fastify.register(workoutRoutes, { prefix: '/api/v1/workouts' });
   await fastify.register(achievementRoutes, { prefix: '/api/v1/achievements' });
   await fastify.register(communityRoutes, { prefix: '/api/v1/community' });
+  await fastify.register(dietPlanRoutes, { prefix: '/api/v1/diet-plans' });
 
   return fastify;
 }

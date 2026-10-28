@@ -60,6 +60,10 @@ CREATE TABLE IF NOT EXISTS meals (
     carbs_g NUMERIC(6, 1) NOT NULL DEFAULT 0,
     fat_g NUMERIC(6, 1) NOT NULL DEFAULT 0,
     fiber_g NUMERIC(6, 1) NOT NULL DEFAULT 0,
+    sugars_g NUMERIC(6, 1) NOT NULL DEFAULT 0,
+    saturated_fat_g NUMERIC(6, 1) NOT NULL DEFAULT 0,
+    sodium_mg NUMERIC(8, 1) NOT NULL DEFAULT 0,
+    cholesterol_mg NUMERIC(8, 1) NOT NULL DEFAULT 0,
     confidence TEXT DEFAULT 'high',
     health_tips TEXT,
     ingredients JSONB DEFAULT '[]'::jsonb,
@@ -69,6 +73,22 @@ CREATE TABLE IF NOT EXISTS meals (
 
 CREATE INDEX IF NOT EXISTS idx_meals_user_id ON meals(user_id);
 CREATE INDEX IF NOT EXISTS idx_meals_logged_at ON meals(logged_at DESC);
+
+ALTER TABLE meals ADD COLUMN IF NOT EXISTS sugars_g NUMERIC(6, 1) NOT NULL DEFAULT 0;
+ALTER TABLE meals ADD COLUMN IF NOT EXISTS saturated_fat_g NUMERIC(6, 1) NOT NULL DEFAULT 0;
+ALTER TABLE meals ADD COLUMN IF NOT EXISTS sodium_mg NUMERIC(8, 1) NOT NULL DEFAULT 0;
+ALTER TABLE meals ADD COLUMN IF NOT EXISTS cholesterol_mg NUMERIC(8, 1) NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS diet_plans (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    plan JSONB NOT NULL,
+    model TEXT NOT NULL,
+    context_sources TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_diet_plans_user_created ON diet_plans(user_id, created_at DESC);
 
 -- 4. DAILY AGGREGATES & STEPS
 CREATE TABLE IF NOT EXISTS daily_activity_logs (

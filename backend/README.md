@@ -52,7 +52,11 @@ Open in your browser:
 ### 🥗 2. AI Food Vision Scanner (`/api/v1/vision`)
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/v1/vision/scan-food` | Send food base64 image; returns dish name, estimated grams, calories, carbs, protein, fat, fiber, health tips, and ingredients. (Results cached in Redis via image SHA-256 hash). |
+| `POST` | `/api/v1/vision/scan-food` | Send a food photo as base64; returns estimated calories, macros, fiber, sugar, saturated fat, sodium, cholesterol, confidence, and ingredients. Results are cached by image hash. |
+| `POST` | `/api/v1/diet-plans/generate` | Generate and persist a personalized 7-day plan from the signed-in user's goals, body details, calorie/macro targets, restrictions, and recent meal history. Optional `{ "focus": "quick vegetarian lunches" }`. |
+| `GET` | `/api/v1/diet-plans/latest` | Fetch the signed-in user's most recently saved plan. |
+
+Diet-plan context is intentionally modular: add a `DietPlanContextProvider` in `src/services/diet-plan.service.ts` to include a future source (such as community meal suggestions). Each provider has a name and returns context for the authenticated user; the source names are saved with each generated plan for traceability.
 
 ### 🏆 3. Strava-style Leaderboard (`/api/v1/leaderboard`)
 | Method | Endpoint | Description |
@@ -95,7 +99,7 @@ All routes below that change or expose personal data require `Authorization: Bea
 ## Local setup
 
 1. Create a Twilio Verify service in your Twilio Console. In `backend`, copy `.env.example` to `.env`, set `TWILIO_VERIFY_SERVICE_SID`, and preferably set `TWILIO_API_KEY_SID` plus `TWILIO_API_KEY_SECRET` from a Standard API key created in the same Twilio account and region. Alternatively set `TWILIO_ACCOUNT_SID` plus `TWILIO_AUTH_TOKEN`. Phone numbers must include the country code in E.164 form, for example `+919876543210`. Twilio trial accounts may restrict delivery to verified recipient numbers.
-2. Set `GEMINI_API_KEY` if you want live food analysis.
+2. Set `GEMINI_API_KEY` in the backend environment for live food photo analysis and diet plan generation. `GEMINI_MODEL` defaults to `gemini-3.8-flash`. Never put the key in an `EXPO_PUBLIC_*` variable or mobile app.
 3. Run `npm ci`.
 4. Run `docker compose up -d` to start PostgreSQL/PostGIS and Redis.
 5. Run `npm run dev`. Startup applies the idempotent schema and seeds a small workout catalog.
@@ -157,4 +161,4 @@ Invoke-RestMethod -Method Post -Uri "$base/community/challenges/$($challenge.cha
 Invoke-RestMethod -Uri "$base/community/challenges/$($challenge.challenge.id)/leaderboard" -Headers $headers
 ```
 
-To verify access control, repeat a protected call without `$headers`; it should return `401`. To verify ownership, create a second account and try to read the first account's `/auth/profile/:id` or `/activities/user/:userId`; it should return `403`. `POST /vision/scan-food` accepts `{imageBase64,mimeType}`; without `GEMINI_API_KEY` it returns a deterministic demo meal, while still recording it under the authenticated user.
+To verify access control, repeat a protected call without `$headers`; it should return `401`. To verify ownership, create a second account and try to read the first account's `/auth/profile/:id` or `/activities/user/:userId`; it should return `403`. `POST /vision/scan-food` accepts `{imageBase64,mimeType}`. Without `GEMINI_API_KEY`, AI endpoints return `503` and do not create fake results.

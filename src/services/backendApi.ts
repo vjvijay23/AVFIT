@@ -63,10 +63,16 @@ export const BackendApi = {
     });
     return result.data;
   },
-  updateMeal(id: string, meal: { dishName?: string; portionGrams?: number; calories?: number; proteinG?: number; carbsG?: number; fatG?: number; fiberG?: number; mealType?: string }) {
+  generateDietPlan(focus?: string) {
+    return apiRequest<{ success: boolean; plan: Record<string, any> }>('/diet-plans/generate', { method: 'POST', body: JSON.stringify({ focus }) });
+  },
+  getLatestDietPlan() {
+    return apiRequest<{ success: boolean; plan: Record<string, any> | null }>('/diet-plans/latest');
+  },
+  updateMeal(id: string, meal: { dishName?: string; portionGrams?: number; calories?: number; proteinG?: number; carbsG?: number; fatG?: number; fiberG?: number; sugarsG?: number; saturatedFatG?: number; sodiumMg?: number; cholesterolMg?: number; mealType?: string }) {
     return apiRequest(`/meals/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(meal) });
   },
-  createMeal(meal: { dishName: string; portionGrams: number; calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; mealType: string }) {
+  createMeal(meal: { dishName: string; portionGrams: number; calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarsG?: number; saturatedFatG?: number; sodiumMg?: number; cholesterolMg?: number; mealType: string }) {
     return apiRequest('/meals', { method: 'POST', body: JSON.stringify(meal) });
   },
   getMeals(date?: string) {

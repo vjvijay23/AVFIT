@@ -52,37 +52,28 @@ export default function FoodScannerScreen() {
 
   useEffect(() => { loadMeals(); }, []);
 
-  const [scannedResult, setScannedResult] = useState<FoodNutritionEstimate>({
-    dish_name: 'Grilled Salmon with Quinoa & Steamed Greens',
-    estimated_weight_g: 350,
-    calories: 540,
-    protein_g: 44,
-    carbs_g: 46,
-    fat_g: 16,
-    fiber_g: 6.5,
-    confidence: 'high',
-    health_tips: 'High-protein, heart-healthy meal with clean carbs and Omega-3 fats.',
-    ingredients: [
-      { name: 'Grilled Atlantic Salmon', weight_g: 170, calories: 290 },
-      { name: 'Steamed Quinoa', weight_g: 110, calories: 155 },
-      { name: 'Steamed Broccoli & Kale', weight_g: 70, calories: 25 },
-      { name: 'Extra Virgin Olive Oil', weight_g: 8, calories: 70 },
-    ],
-  });
+  const [scannedResult, setScannedResult] = useState<FoodNutritionEstimate | null>(null);
 
   const handleAdjustPortion = (delta: number) => {
+    if (!scannedResult) return;
     const newWeight = Math.max(50, portionGrams + delta);
+    const previous = scannedResult;
+    const ratio = newWeight / Math.max(previous.estimated_weight_g, 1);
     setPortionGrams(newWeight);
     setIsSaved(false);
-    setScannedResult((prev) => ({
-      ...prev,
+    setScannedResult({
+      ...previous,
       estimated_weight_g: newWeight,
-      calories: Math.round(prev.calories * newWeight / Math.max(prev.estimated_weight_g, 1)),
-      protein_g: Math.round(prev.protein_g * newWeight / Math.max(prev.estimated_weight_g, 1) * 10) / 10,
-      carbs_g: Math.round(prev.carbs_g * newWeight / Math.max(prev.estimated_weight_g, 1) * 10) / 10,
-      fat_g: Math.round(prev.fat_g * newWeight / Math.max(prev.estimated_weight_g, 1) * 10) / 10,
-      fiber_g: Math.round(prev.fiber_g * newWeight / Math.max(prev.estimated_weight_g, 1) * 10) / 10,
-    }));
+      calories: Math.round(previous.calories * ratio),
+      protein_g: Math.round(previous.protein_g * ratio * 10) / 10,
+      carbs_g: Math.round(previous.carbs_g * ratio * 10) / 10,
+      fat_g: Math.round(previous.fat_g * ratio * 10) / 10,
+      fiber_g: Math.round(previous.fiber_g * ratio * 10) / 10,
+      sugars_g: Math.round((previous.sugars_g || 0) * ratio * 10) / 10,
+      saturated_fat_g: Math.round((previous.saturated_fat_g || 0) * ratio * 10) / 10,
+      sodium_mg: Math.round((previous.sodium_mg || 0) * ratio * 10) / 10,
+      cholesterol_mg: Math.round((previous.cholesterol_mg || 0) * ratio * 10) / 10,
+    });
   };
 
   const handlePickImage = async () => {
@@ -131,6 +122,7 @@ export default function FoodScannerScreen() {
     setIsScanning(true);
     setIsSaved(false);
     setMealId(null);
+    setScannedResult(null);
     try {
       if (!asset.base64) throw new Error('The selected image could not be encoded. Please choose another photo.');
       const result = await BackendApi.scanFood(asset.base64, asset.mimeType || 'image/jpeg');
@@ -143,6 +135,7 @@ export default function FoodScannerScreen() {
   };
 
   const handleSaveToDiary = async () => {
+    if (!scannedResult) return;
     try {
       const meal = {
         dishName: scannedResult.dish_name,
@@ -152,6 +145,10 @@ export default function FoodScannerScreen() {
         carbsG: scannedResult.carbs_g,
         fatG: scannedResult.fat_g,
         fiberG: scannedResult.fiber_g,
+        sugarsG: scannedResult.sugars_g,
+        saturatedFatG: scannedResult.saturated_fat_g,
+        sodiumMg: scannedResult.sodium_mg,
+        cholesterolMg: scannedResult.cholesterol_mg,
         mealType: selectedCategory.toLowerCase(),
       };
       if (mealId) await BackendApi.updateMeal(mealId, meal);
@@ -244,8 +241,13 @@ export default function FoodScannerScreen() {
           </TouchableOpacity>
         </View>
 
+        {!scannedResult && !isScanning && <View style={styles.resultCard}>
+          <Text style={styles.ingredientsTitle}>Nutrition estimate</Text>
+          <Text style={styles.dishSub}>Take a photo or choose one from your gallery. Gemini will estimate the food, portion, and nutrients.</Text>
+        </View>}
+
         {/* Scanned Nutrition Results Card */}
-        <View style={styles.resultCard}>
+        {scannedResult && <View style={styles.resultCard}>
           <View style={styles.dishHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.dishTitle}>{scannedResult.dish_name}</Text>
@@ -253,9 +255,18 @@ export default function FoodScannerScreen() {
             </View>
             <View style={styles.confidencePill}>
               <CheckCircle size={12} color="#16A34A" />
-              <Text style={styles.confidenceText}>High Accuracy</Text>
+              <Text style={styles.confidenceText}>{scannedResult.confidence} confidence</Text>
             </View>
           </View>
+
+          <View style={styles.nutrientRows}>
+            <View style={styles.nutrientRow}><Text style={styles.ingredientName}>Fiber</Text><Text style={styles.ingredientMeta}>{scannedResult.fiber_g} g</Text></View>
+            <View style={styles.nutrientRow}><Text style={styles.ingredientName}>Sugars</Text><Text style={styles.ingredientMeta}>{scannedResult.sugars_g ?? '—'} g</Text></View>
+            <View style={styles.nutrientRow}><Text style={styles.ingredientName}>Saturated fat</Text><Text style={styles.ingredientMeta}>{scannedResult.saturated_fat_g ?? '—'} g</Text></View>
+            <View style={styles.nutrientRow}><Text style={styles.ingredientName}>Sodium</Text><Text style={styles.ingredientMeta}>{scannedResult.sodium_mg ?? '—'} mg</Text></View>
+            <View style={styles.nutrientRow}><Text style={styles.ingredientName}>Cholesterol</Text><Text style={styles.ingredientMeta}>{scannedResult.cholesterol_mg ?? '—'} mg</Text></View>
+          </View>
+          {!!scannedResult.health_tips && <Text style={styles.healthTip}>{scannedResult.health_tips}</Text>}
 
           {/* Calorie & Portion Adjuster */}
           <View style={styles.caloriesBanner}>
@@ -322,7 +333,7 @@ export default function FoodScannerScreen() {
               </>
             )}
           </TouchableOpacity>
-        </View>
+        </View>}
 
         {recentMeals.length > 0 && <View style={styles.diaryCard}>
           <Text style={styles.ingredientsTitle}>Today’s Food Diary</Text>
@@ -338,6 +349,9 @@ export default function FoodScannerScreen() {
 
 const styles = StyleSheet.create({
   diaryCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginTop: 14, borderWidth: 1, borderColor: Colors.borderSubtle },
+  nutrientRows: { marginTop: 4, marginBottom: 10 },
+  nutrientRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderSubtle },
+  healthTip: { color: '#59645D', fontSize: 12, lineHeight: 18, backgroundColor: '#EFF5F0', padding: 11, borderRadius: 12, marginVertical: 8 },
   container: {
     flex: 1,
     backgroundColor: Colors.background,

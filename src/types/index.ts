@@ -187,6 +187,10 @@ export interface FoodNutritionEstimate {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+  sugars_g?: number;
+  saturated_fat_g?: number;
+  sodium_mg?: number;
+  cholesterol_mg?: number;
   confidence: 'high' | 'medium' | 'low';
   health_tips?: string;
   ingredients?: Array<{
