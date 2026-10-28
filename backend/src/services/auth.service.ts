@@ -86,7 +86,7 @@ export class AuthService {
       const identifier = await msg91VerifyAccessToken(providerAccessToken);
       const verifiedPhone = normalizePhone(identifier.startsWith('+') ? identifier : `+${identifier}`);
       if (verifiedPhone !== cleanPhone) {
-        throw new Error('Invalid or expired verification code. Request a new code and try again.');
+        throw new Error('The phone number verified by MSG91 does not match the number entered. Edit the number and request a new OTP.');
       }
     } else if (config.otpProvider === 'mock') {
       if (typeof otp !== 'string' || !/^\d{6}$/.test(otp)) throw new Error('Enter the 6-digit verification code sent to your phone.');
@@ -234,7 +234,7 @@ async function msg91VerifyAccessToken(accessToken: string): Promise<string> {
         throw new Error('MSG91 authentication failed. Check the account Authkey and its IP allowlist in the backend environment.');
       }
       if (result.type === 'error') {
-        throw new Error('Invalid or expired verification code. Request a new code and try again.');
+        throw new Error('MSG91 rejected the verification token. Request a fresh OTP; if this repeats, confirm the mobile widget and MSG91_AUTHKEY belong to the same MSG91 account.');
       }
       throw new Error('MSG91 could not validate this verification. Check the widget and account configuration, then try again.');
     }
