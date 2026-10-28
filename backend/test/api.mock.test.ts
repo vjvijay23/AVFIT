@@ -65,6 +65,7 @@ test('health reports mocked PostgreSQL and Redis as healthy', async () => {
   assert.equal(body.status, 'healthy');
   assert.equal(body.postgres, true);
   assert.equal(body.redis, true);
+  assert.equal(body.version, process.env.RENDER_GIT_COMMIT || 'local');
 });
 
 test('health reports degraded when mocked Redis is unavailable', async () => {
@@ -256,6 +257,31 @@ test('MSG91 invalid access-token responses are reported as invalid OTP instead o
     assert.equal(response.statusCode, 401);
     assert.match(response.json().error, /Invalid or expired/);
     assert.equal(queryCount, 0);
+  } finally {
+    config.otpProvider = previous.provider;
+    config.msg91AuthKey = previous.authKey;
+  }
+});
+
+test('MSG91 transport failures include a sanitized diagnostic code', async () => {
+  const previous = { provider: config.otpProvider, authKey: config.msg91AuthKey };
+  config.otpProvider = 'twilio';
+  config.msg91AuthKey = 'mock-msg91-authkey';
+  const cause = Object.assign(new Error('network unreachable'), { code: 'ENETUNREACH' });
+  globalThis.fetch = (async () => { throw Object.assign(new TypeError('fetch failed'), { cause }); }) as typeof fetch;
+  queryHandler = async () => { throw new Error('User query should not run after failed token verification.'); };
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/otp/verify',
+      payload: { phone: mockPhone, accessToken: 'mock-msg91-access-token-0001', authMode: 'signup' },
+    });
+    assert.equal(response.statusCode, 503);
+    assert.deepEqual(response.json(), {
+      error: 'Could not reach MSG91 verification. Please try again shortly.',
+      providerDiagnosticCode: 'ENETUNREACH',
+    });
   } finally {
     config.otpProvider = previous.provider;
     config.msg91AuthKey = previous.authKey;
