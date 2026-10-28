@@ -228,8 +228,8 @@ test('MSG91 verification rejects a verified token for a different phone before r
       url: '/api/v1/auth/otp/verify',
       payload: { phone: mockPhone, accessToken: 'mock-msg91-access-token-0001', authMode: 'login' },
     });
-    assert.equal(response.statusCode, 401);
-    assert.match(response.json().error, /Invalid or expired/);
+    assert.equal(response.statusCode, 400);
+    assert.match(response.json().error, /phone number verified by MSG91 does not match/);
     assert.equal(queryCount, 0);
   } finally {
     config.otpProvider = previous.provider;
@@ -255,7 +255,7 @@ test('MSG91 invalid access-token responses are reported as invalid OTP instead o
       payload: { phone: mockPhone, accessToken: 'expired-msg91-access-token', authMode: 'signup' },
     });
     assert.equal(response.statusCode, 401);
-    assert.match(response.json().error, /Invalid or expired/);
+    assert.match(response.json().error, /MSG91 rejected the verification token/);
     assert.equal(queryCount, 0);
   } finally {
     config.otpProvider = previous.provider;
