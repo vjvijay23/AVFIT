@@ -215,11 +215,17 @@ async function msg91VerifyAccessToken(accessToken: string): Promise<string> {
         body: JSON.stringify({ authkey: msg91AuthKey, 'access-token': accessToken }),
         signal: controller.signal,
       });
-    } catch {
+    } catch (error) {
       // Only transport errors and timeouts should be reported as unreachable.
       // Keep MSG91's HTTP/body validation errors below so the route can return
       // the correct invalid-code or configuration response to the app.
-      throw new Error('Could not reach MSG91 verification. Please try again shortly.');
+      const cause = error instanceof Error ? error.cause as { code?: unknown } | undefined : undefined;
+      const rawCode = typeof cause?.code === 'string'
+        ? cause.code
+        : error instanceof Error ? error.name : 'UNKNOWN';
+      const transportError = new Error('Could not reach MSG91 verification. Please try again shortly.', { cause: error }) as Error & { providerDiagnosticCode?: string };
+      transportError.providerDiagnosticCode = /^[A-Z0-9_]{1,64}$/i.test(rawCode) ? rawCode : 'UNKNOWN';
+      throw transportError;
     }
     const result = await response.json().catch(() => ({})) as { type?: string; message?: string; code?: string | number };
     // MSG91 can return HTTP 200 with an error payload, so check the body too.
