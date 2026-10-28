@@ -11,18 +11,18 @@ export async function authRoutes(fastify: FastifyInstance) {
       const res = await AuthService.requestOtp(phone);
       return reply.send(res);
     } catch (err: any) {
-      const unavailable = /SMS verification (is not configured|service rejected)|Twilio authentication failed|Could not reach the SMS/i.test(err.message || '');
+      const unavailable = /SMS verification (is not configured|service rejected)|Twilio authentication failed|MSG91 (verification is not configured|authentication failed|could not validate)|Could not reach (the SMS|MSG91)/i.test(err.message || '');
       return reply.status(unavailable ? 503 : 400).send({ error: err.message });
     }
   });
 
   // Verify OTP and return profile + JWT
-  fastify.post<{ Body: { phone: string; otp: string; authMode?: 'login' | 'signup'; profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string } } }>(
+  fastify.post<{ Body: { phone: string; otp?: string; accessToken?: string; authMode?: 'login' | 'signup'; profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string } } }>(
     '/otp/verify',
     async (request, reply) => {
-      const { phone, otp, profile, authMode } = request.body || {};
+      const { phone, otp = '', accessToken, profile, authMode } = request.body || {};
       try {
-        const user = await AuthService.verifyOtp(phone, otp, profile, authMode);
+        const user = await AuthService.verifyOtp(phone, otp, profile, authMode, accessToken);
         const token = fastify.jwt.sign({ id: user.id, phone: user.phone }, { expiresIn: '7d' });
         return reply.send({
           success: true,
@@ -31,12 +31,24 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
       } catch (err: any) {
         const message = err.message || '';
-        const unavailable = /SMS verification (is not configured|service rejected)|Twilio authentication failed|Could not reach the SMS/i.test(message);
+        const unavailable = /SMS verification (is not configured|service rejected)|Twilio authentication failed|MSG91 (verification is not configured|authentication failed|could not validate)|Could not reach (the SMS|MSG91)/i.test(message);
         const status = unavailable ? 503 : /Invalid or expired/.test(message) ? 401 : 400;
         return reply.status(status).send({ error: message });
       }
     }
   );
+
+  // MSG91's optional existence-validation hook. The widget is shared by signup
+  // and login, so return a privacy-preserving positive response for any
+  // syntactically plausible phone. AVFIT enforces login/signup rules after OTP.
+  fastify.get<{ Querystring: { identifier?: string } }>('/otp/user-exists', async (request, reply) => {
+    const identifier = typeof request.query.identifier === 'string' ? request.query.identifier.trim() : '';
+    const digits = identifier.replace(/\D/g, '');
+    if (digits.length < 8 || digits.length > 15) {
+      return reply.status(400).send({ user_found: false, identifier });
+    }
+    return { user_found: true, identifier };
+  });
 
   // Fetch profile
   fastify.get<{ Params: { id: string } }>('/profile/:id', { preHandler: requireAuth }, async (request, reply) => {

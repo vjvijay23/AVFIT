@@ -59,7 +59,7 @@ export default function OtpVerificationScreen({
   const [successNotice, setSuccessNotice] = useState<string | null>(
     route?.params?.developmentOtp
       ? `Development mock OTP: ${route.params.developmentOtp}. No SMS was sent.`
-      : 'Enter the 6-digit code sent by SMS to your phone.'
+      : 'Enter the 6-digit verification code sent to your phone.'
   );
 
   const inputRefs = useRef<Array<TextInput | null>>([]);
@@ -151,13 +151,13 @@ export default function OtpVerificationScreen({
     setSuccessNotice(null);
 
     try {
-      const response = await AuthService.sendPhoneOtp({ phone, countryCode });
+      const response = await AuthService.resendPhoneOtp({ phone, countryCode });
       setDevelopmentOtp(response.developmentOtp);
       setCountdown(60);
       setCanResend(false);
       setSuccessNotice(response.developmentOtp
         ? `Development mock OTP: ${response.developmentOtp}. No SMS was sent.`
-        : 'A new verification code was sent by SMS.');
+        : response.message || 'A new verification code was sent to your phone.');
       setOtpDigits(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } catch (err: any) {

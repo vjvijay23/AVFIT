@@ -32,7 +32,7 @@ import {
 const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'] as const;
 type MealCategory = (typeof MEAL_CATEGORIES)[number];
 
-export default function FoodScannerScreen() {
+export default function FoodScannerScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const [isScanning, setIsScanning] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -41,6 +41,20 @@ export default function FoodScannerScreen() {
   const [isSaved, setIsSaved] = useState(false);
   const [mealId, setMealId] = useState<string | null>(null);
   const [recentMeals, setRecentMeals] = useState<Array<Record<string, any>>>([]);
+
+  const requireSignIn = () => {
+    if (BackendApi.hasAuthToken()) return true;
+    Alert.alert(
+      'Sign in to scan meals',
+      'Food analysis and saving meals are linked to your account. Sign in or create an account to continue.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign in', onPress: () => navigation.navigate('Login') },
+        { text: 'Create account', onPress: () => navigation.navigate('Signup') },
+      ],
+    );
+    return false;
+  };
 
   const loadMeals = async () => {
     if (!BackendApi.hasAuthToken()) return;
@@ -77,6 +91,7 @@ export default function FoodScannerScreen() {
   };
 
   const handlePickImage = async () => {
+    if (!requireSignIn()) return;
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -96,6 +111,7 @@ export default function FoodScannerScreen() {
   };
 
   const handleCaptureImage = async () => {
+    if (!requireSignIn()) return;
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {

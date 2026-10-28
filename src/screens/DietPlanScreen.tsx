@@ -14,12 +14,21 @@ export default function DietPlanScreen({ navigation }: any) {
   const [plan, setPlan] = useState<DietPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const signedIn = BackendApi.hasAuthToken();
 
   useEffect(() => {
+    if (!BackendApi.hasAuthToken()) {
+      setLoading(false);
+      return;
+    }
     BackendApi.getLatestDietPlan().then((response) => setPlan(response.plan?.plan || null)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const generate = async () => {
+    if (!BackendApi.hasAuthToken()) {
+      Alert.alert('Sign in required', 'Your diet plan is personalized and saved to your account. Sign in or create an account first.');
+      return;
+    }
     setGenerating(true);
     try {
       const response = await BackendApi.generateDietPlan(focus.trim() || undefined);
@@ -40,6 +49,13 @@ export default function DietPlanScreen({ navigation }: any) {
       </View>
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 + insets.bottom }} showsVerticalScrollIndicator={false}>
         <View style={styles.promptCard}>
+          {!signedIn ? <>
+            <Text style={styles.sectionTitle}>Sign in to create your plan</Text>
+            <Text style={styles.helpText}>Your plan uses your saved fitness profile and is stored with your account.</Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.primaryButtonText}>Sign in or create an account</Text>
+            </TouchableOpacity>
+          </> : <>
           <Text style={styles.sectionTitle}>Add a preference (optional)</Text>
           <Text style={styles.helpText}>Your goal, calorie needs, body details, dietary preference, and restrictions are loaded from your profile.</Text>
           <TextInput value={focus} onChangeText={setFocus} placeholder="For example: quick vegetarian lunches" placeholderTextColor="#828A83" style={styles.input} maxLength={300} />
@@ -47,6 +63,7 @@ export default function DietPlanScreen({ navigation }: any) {
             {generating ? <ActivityIndicator color="#fff" /> : <Sparkles color="#fff" size={18} />}
             <Text style={styles.primaryButtonText}>{generating ? 'Building your plan…' : plan ? 'Generate a new 7-day plan' : 'Generate my 7-day plan'}</Text>
           </TouchableOpacity>
+          </>}
         </View>
 
         {loading && <ActivityIndicator style={{ marginTop: 28 }} color={Colors.primary} />}

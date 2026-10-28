@@ -16,11 +16,12 @@ export const config = {
   twilioApiKeySid: process.env.TWILIO_API_KEY_SID || '',
   twilioApiKeySecret: process.env.TWILIO_API_KEY_SECRET || '',
   twilioVerifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID || '',
+  msg91AuthKey: process.env.MSG91_AUTHKEY || '',
   otpProvider: process.env.OTP_PROVIDER || 'twilio',
 };
 
-if (!['twilio', 'mock'].includes(config.otpProvider)) {
-  throw new Error('OTP_PROVIDER must be either "twilio" or "mock".');
+if (!['twilio', 'msg91', 'mock'].includes(config.otpProvider)) {
+  throw new Error('OTP_PROVIDER must be either "twilio", "msg91", or "mock".');
 }
 
 if (config.nodeEnv === 'production' && config.otpProvider === 'mock') {

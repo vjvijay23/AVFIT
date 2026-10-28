@@ -127,10 +127,10 @@ function MainTabs() {
   );
 }
 
-export default function RootNavigator() {
+export default function RootNavigator({ initialRouteName = 'AuthWelcome' }: { initialRouteName?: 'AuthWelcome' | 'Main' }) {
   return (
     <Stack.Navigator
-      initialRouteName="AuthWelcome"
+      initialRouteName={initialRouteName}
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',

@@ -1,9 +1,24 @@
 import { FoodNutritionEstimate, GPSPoint } from '../types';
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 // Point the app at the deployed API by default. Set EXPO_PUBLIC_API_URL to a local
 // backend URL when developing against a local server (Android emulator: 10.0.2.2).
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://avfit-api.onrender.com/api/v1').replace(/\/$/, '');
 let authToken: string | null = null;
+const AUTH_SESSION_KEY = 'avfit.backend.auth-session';
+
+type SavedAuthSession = { token: string; userId: string };
+
+async function saveAuthSession(session: SavedAuthSession | null): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    if (session) await SecureStore.setItemAsync(AUTH_SESSION_KEY, JSON.stringify(session));
+    else await SecureStore.deleteItemAsync(AUTH_SESSION_KEY);
+  } catch {
+    // Keep the current session usable even if device secure storage is unavailable.
+  }
+}
 
 type RequestOptions = RequestInit & { authenticated?: boolean };
 
@@ -20,6 +35,22 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
 export const BackendApi = {
   setAuthToken(token: string | null) { authToken = token; },
   hasAuthToken() { return Boolean(authToken); },
+  async restoreAuthSession(): Promise<string | null> {
+    if (Platform.OS === 'web') return null;
+    try {
+      const raw = await SecureStore.getItemAsync(AUTH_SESSION_KEY);
+      if (!raw) return null;
+      const session = JSON.parse(raw) as Partial<SavedAuthSession>;
+      if (typeof session.token !== 'string' || typeof session.userId !== 'string') {
+        await SecureStore.deleteItemAsync(AUTH_SESSION_KEY);
+        return null;
+      }
+      authToken = session.token;
+      return session.userId;
+    } catch {
+      return null;
+    }
+  },
   async checkHealth(): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL.replace(/\/api\/v1$/, '')}/health`);
@@ -31,11 +62,12 @@ export const BackendApi = {
       method: 'POST', authenticated: false, body: JSON.stringify({ phone }),
     });
   },
-  async verifyOtp(phone: string, otp: string, profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string }, authMode: 'login' | 'signup' = 'login') {
+  async verifyOtp(phone: string, otp: string, profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string }, authMode: 'login' | 'signup' = 'login', accessToken?: string) {
     const result = await apiRequest<{ success: boolean; token: string; user: { id: string; phone: string; fullName: string; avatarUrl?: string | null; dateOfBirth?: string | null; gender?: string | null; country?: string | null; preferredUnits?: string | null; streakCount: number; isOnboarded?: boolean; isNewUser?: boolean } }>('/auth/otp/verify', {
-      method: 'POST', authenticated: false, body: JSON.stringify({ phone, otp, profile, authMode }),
+      method: 'POST', authenticated: false, body: JSON.stringify({ phone, otp, accessToken, profile, authMode }),
     });
     authToken = result.token;
+    await saveAuthSession({ token: result.token, userId: result.user.id });
     return result;
   },
   async updateProfile(profile: { fullName?: string; avatarUrl?: string | null; dateOfBirth?: string | null; gender?: string; country?: string; preferredUnits?: string }) {
@@ -147,5 +179,8 @@ export const BackendApi = {
   getStepsLeaderboard(limit = 25) {
     return apiRequest<{ success: boolean; leaderboard: Array<Record<string, any>> }>(`/leaderboard/steps?limit=${limit}`);
   },
-  async signOut() { authToken = null; },
+  async signOut() {
+    authToken = null;
+    await saveAuthSession(null);
+  },
 };

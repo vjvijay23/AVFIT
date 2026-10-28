@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { AuthUser, PhoneAuthRequest, OtpVerifyRequest, UserProfile, Gender } from '../types';
 import { UserStore } from './userStore';
 import { BackendApi } from './backendApi';
+import * as Msg91Otp from './msg91Otp';
 
 export interface PendingSignupData {
   fullName: string;
@@ -24,6 +25,12 @@ const phoneToUserIdMap: Record<string, string> = {
 };
 
 export const AuthService = {
+  async restoreSession(): Promise<boolean> {
+    const userId = await BackendApi.restoreAuthSession();
+    if (!userId) return false;
+    currentActiveUserId = userId;
+    return true;
+  },
   /**
    * Get the active authenticated user's ID
    */
@@ -41,6 +48,11 @@ export const AuthService = {
     const fullPhone = request.phone.trim();
     if (!fullPhone || fullPhone.length < 8) {
       throw new Error('Please enter a valid mobile phone number with country code.');
+    }
+
+    if (process.env.EXPO_PUBLIC_OTP_PROVIDER === 'msg91') {
+      await Msg91Otp.sendOtp(fullPhone);
+      return { success: true, message: 'Verification code sent by MSG91.', isMock: false };
     }
 
     const response = await BackendApi.sendOtp(fullPhone);
@@ -69,7 +81,10 @@ export const AuthService = {
       throw new Error('Please enter the complete 6-digit verification code.');
     }
 
-    const response = await BackendApi.verifyOtp(phone, cleanToken, pendingProfile, authMode);
+    const accessToken = process.env.EXPO_PUBLIC_OTP_PROVIDER === 'msg91'
+      ? await Msg91Otp.verifyOtp(phone, cleanToken)
+      : undefined;
+    const response = await BackendApi.verifyOtp(phone, accessToken ? '' : cleanToken, pendingProfile, authMode, accessToken);
     const isNewUser = response.user.isNewUser ?? authMode === 'signup';
     const userId = response.user.id;
     currentActiveUserId = userId;
@@ -113,6 +128,14 @@ export const AuthService = {
       isNewUser,
       profile: normalizedProfile,
     };
+  },
+
+  async resendPhoneOtp(request: PhoneAuthRequest): Promise<{ success: boolean; message: string; isMock: boolean; developmentOtp?: string }> {
+    if (process.env.EXPO_PUBLIC_OTP_PROVIDER === 'msg91') {
+      await Msg91Otp.resendOtp(request.phone);
+      return { success: true, message: 'A new verification code was sent by MSG91.', isMock: false };
+    }
+    return this.sendPhoneOtp(request);
   },
 
   /**

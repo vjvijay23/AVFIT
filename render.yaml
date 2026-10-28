@@ -16,7 +16,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: OTP_PROVIDER
-        value: twilio
+        value: msg91
       - key: DATABASE_URL
         fromDatabase:
           name: avfit-postgres
@@ -33,6 +33,8 @@ services:
       - key: TWILIO_AUTH_TOKEN
         sync: false
       - key: TWILIO_VERIFY_SERVICE_SID
+        sync: false
+      - key: MSG91_AUTHKEY
         sync: false
 
 databases:
