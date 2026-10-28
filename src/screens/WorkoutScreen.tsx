@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
@@ -19,12 +21,41 @@ import {
   Sparkles,
   Check,
 } from 'lucide-react-native';
+import { BackendApi } from '../services/backendApi';
 
 export default function WorkoutScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const [timeToggle, setTimeToggle] = useState<'Day' | 'Week'>('Day');
   const [isPlaying, setIsPlaying] = useState(false);
   const [restSeconds, setRestSeconds] = useState(30);
+  const [workouts, setWorkouts] = useState<Array<Record<string, any>>>([]);
+  const [loadingWorkouts, setLoadingWorkouts] = useState(true);
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [workoutLogs, setWorkoutLogs] = useState<Array<Record<string, any>>>([]);
+
+  useEffect(() => {
+    BackendApi.getWorkoutCatalog()
+      .then((result) => setWorkouts(result.workouts))
+      .catch((error) => Alert.alert('Workout catalogue unavailable', error.message))
+      .finally(() => setLoadingWorkouts(false));
+  }, []);
+
+  useEffect(() => {
+    if (BackendApi.hasAuthToken()) BackendApi.getWorkoutLogs().then((result) => setWorkoutLogs(result.logs)).catch(() => undefined);
+  }, []);
+
+  const completeWorkout = async (workout: Record<string, any>) => {
+    setCompletingId(workout.id);
+    try {
+      const result = await BackendApi.completeWorkout(workout.id, Number(workout.duration_minutes) * 60);
+      setWorkoutLogs((logs) => [result.log, ...logs]);
+      Alert.alert('Workout saved', `${result.log.workout_title} was added to your workout history.`);
+    } catch (error: any) {
+      Alert.alert('Could not save workout', error?.message || 'Please sign in and try again.');
+    } finally {
+      setCompletingId(null);
+    }
+  };
 
   useEffect(() => {
     let timer: any;
@@ -199,12 +230,41 @@ export default function WorkoutScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
+        <Text style={styles.catalogTitle}>Workout Library</Text>
+        <Text style={styles.catalogSubtitle}>Choose a guided session. Completed workouts are saved to your AVFIT account.</Text>
+        {loadingWorkouts && <ActivityIndicator color={Colors.primary} style={{ marginVertical: 18 }} />}
+        {!loadingWorkouts && workouts.length === 0 && <Text style={styles.catalogSubtitle}>No workouts are available right now.</Text>}
+        {workouts.map((workout) => (
+          <View key={workout.id} style={styles.workoutCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.workoutName}>{workout.title}</Text>
+              <Text style={styles.workoutMeta}>{workout.category} · {workout.difficulty} · {workout.duration_minutes} min · {workout.est_calories_burned} kcal</Text>
+              {!!workout.description && <Text style={styles.catalogSubtitle}>{workout.description}</Text>}
+            </View>
+            <TouchableOpacity style={styles.completeButton} disabled={completingId === workout.id} onPress={() => completeWorkout(workout)}>
+              {completingId === workout.id ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.completeButtonText}>Complete</Text>}
+            </TouchableOpacity>
+          </View>
+        ))}
+        {workoutLogs.length > 0 && <>
+          <Text style={styles.catalogTitle}>Recent Completed Workouts</Text>
+          {workoutLogs.slice(0, 5).map((log) => <Text key={log.id} style={styles.logRow}>{log.workout_title} · {Math.round(Number(log.duration_seconds) / 60)} min</Text>)}
+        </>}
+
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  catalogTitle: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary, marginTop: 24, marginBottom: 4 },
+  catalogSubtitle: { fontSize: 12, lineHeight: 17, color: Colors.textSecondary, marginBottom: 10 },
+  workoutCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: Colors.borderSubtle, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  workoutName: { color: Colors.textPrimary, fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  workoutMeta: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 5 },
+  completeButton: { backgroundColor: Colors.primary, borderRadius: 16, minWidth: 72, paddingHorizontal: 10, paddingVertical: 9, alignItems: 'center' },
+  completeButtonText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  logRow: { color: Colors.textSecondary, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 12, marginBottom: 8, fontSize: 12, fontWeight: '700' },
   container: {
     flex: 1,
     backgroundColor: Colors.background,

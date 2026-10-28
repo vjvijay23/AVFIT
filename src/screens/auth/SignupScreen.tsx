@@ -108,6 +108,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           countryCode: selectedCountry.code,
           authMode: 'signup',
           pendingProfile: pendingData,
+          ...(response.developmentOtp ? { developmentOtp: response.developmentOtp } : {}),
         });
       }
     } catch (err: any) {

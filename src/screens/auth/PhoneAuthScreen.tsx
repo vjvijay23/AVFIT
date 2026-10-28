@@ -65,6 +65,7 @@ export default function PhoneAuthScreen({ navigation, onCodeSent }: PhoneAuthScr
             phone: fullPhone,
             countryCode: selectedCountry.code,
             authMode,
+            ...(response.developmentOtp ? { developmentOtp: response.developmentOtp } : {}),
           });
         }
       }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { Colors } from '../theme/colors';
 import { FoodNutritionEstimate } from '../types';
 import { ActivityService } from '../services/activityService';
 import { AuthService } from '../services/auth';
+import { BackendApi } from '../services/backendApi';
 import {
   Camera as CameraIcon,
   Sparkles,
@@ -38,6 +39,18 @@ export default function FoodScannerScreen() {
   const [selectedCategory, setSelectedCategory] = useState<MealCategory>('Lunch');
   const [portionGrams, setPortionGrams] = useState(350);
   const [isSaved, setIsSaved] = useState(false);
+  const [mealId, setMealId] = useState<string | null>(null);
+  const [recentMeals, setRecentMeals] = useState<Array<Record<string, any>>>([]);
+
+  const loadMeals = async () => {
+    if (!BackendApi.hasAuthToken()) return;
+    try {
+      const response = await BackendApi.getMeals(new Date().toISOString().slice(0, 10));
+      setRecentMeals(response.meals);
+    } catch { /* The scanner remains usable when meal history is temporarily unavailable. */ }
+  };
+
+  useEffect(() => { loadMeals(); }, []);
 
   const [scannedResult, setScannedResult] = useState<FoodNutritionEstimate>({
     dish_name: 'Grilled Salmon with Quinoa & Steamed Greens',
@@ -59,17 +72,16 @@ export default function FoodScannerScreen() {
 
   const handleAdjustPortion = (delta: number) => {
     const newWeight = Math.max(50, portionGrams + delta);
-    const scale = newWeight / 350;
     setPortionGrams(newWeight);
     setIsSaved(false);
     setScannedResult((prev) => ({
       ...prev,
       estimated_weight_g: newWeight,
-      calories: Math.round(540 * scale),
-      protein_g: Math.round(44 * scale * 10) / 10,
-      carbs_g: Math.round(46 * scale * 10) / 10,
-      fat_g: Math.round(16 * scale * 10) / 10,
-      fiber_g: Math.round(6.5 * scale * 10) / 10,
+      calories: Math.round(prev.calories * newWeight / Math.max(prev.estimated_weight_g, 1)),
+      protein_g: Math.round(prev.protein_g * newWeight / Math.max(prev.estimated_weight_g, 1) * 10) / 10,
+      carbs_g: Math.round(prev.carbs_g * newWeight / Math.max(prev.estimated_weight_g, 1) * 10) / 10,
+      fat_g: Math.round(prev.fat_g * newWeight / Math.max(prev.estimated_weight_g, 1) * 10) / 10,
+      fiber_g: Math.round(prev.fiber_g * newWeight / Math.max(prev.estimated_weight_g, 1) * 10) / 10,
     }));
   };
 
@@ -80,14 +92,15 @@ export default function FoodScannerScreen() {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        base64: true,
       });
 
       if (!result.canceled && result.assets[0]) {
         setSelectedImageUri(result.assets[0].uri);
-        runScanSimulation();
+        await runFoodScan(result.assets[0]);
       }
-    } catch (e) {
-      runScanSimulation();
+    } catch (e: any) {
+      Alert.alert('Food Scan Failed', e?.message || 'Could not analyze this photo.');
     }
   };
 
@@ -102,32 +115,56 @@ export default function FoodScannerScreen() {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        base64: true,
       });
 
       if (!result.canceled && result.assets[0]) {
         setSelectedImageUri(result.assets[0].uri);
-        runScanSimulation();
+        await runFoodScan(result.assets[0]);
       }
-    } catch (e) {
-      runScanSimulation();
+    } catch (e: any) {
+      Alert.alert('Food Scan Failed', e?.message || 'Could not analyze this photo.');
     }
   };
 
-  const runScanSimulation = () => {
+  const runFoodScan = async (asset: ImagePicker.ImagePickerAsset) => {
     setIsScanning(true);
     setIsSaved(false);
-    setTimeout(() => {
+    setMealId(null);
+    try {
+      if (!asset.base64) throw new Error('The selected image could not be encoded. Please choose another photo.');
+      const result = await BackendApi.scanFood(asset.base64, asset.mimeType || 'image/jpeg');
+      setScannedResult(result);
+      setPortionGrams(result.estimated_weight_g);
+      setMealId(result.mealId || null);
+    } finally {
       setIsScanning(false);
-      setPortionGrams(350);
-    }, 1200);
+    }
   };
 
   const handleSaveToDiary = async () => {
-    setIsSaved(true);
-    Alert.alert(
-      'Meal Logged',
-      `${scannedResult.dish_name} (${scannedResult.calories} kcal) saved to your ${selectedCategory} diary.`
-    );
+    try {
+      const meal = {
+        dishName: scannedResult.dish_name,
+        portionGrams,
+        calories: scannedResult.calories,
+        proteinG: scannedResult.protein_g,
+        carbsG: scannedResult.carbs_g,
+        fatG: scannedResult.fat_g,
+        fiberG: scannedResult.fiber_g,
+        mealType: selectedCategory.toLowerCase(),
+      };
+      if (mealId) await BackendApi.updateMeal(mealId, meal);
+      else {
+        const saved: any = await BackendApi.createMeal(meal);
+        setMealId(saved.meal?.id || null);
+      }
+      setIsSaved(true);
+      await loadMeals();
+      Alert.alert('Meal Logged', `${scannedResult.dish_name} (${scannedResult.calories} kcal) saved to your ${selectedCategory} diary.`);
+    } catch (e: any) {
+      Alert.alert('Save Failed', e?.message || 'Could not save this meal.');
+    }
   };
 
   return (
@@ -286,12 +323,21 @@ export default function FoodScannerScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {recentMeals.length > 0 && <View style={styles.diaryCard}>
+          <Text style={styles.ingredientsTitle}>Today’s Food Diary</Text>
+          {recentMeals.map((meal) => <View key={meal.id} style={styles.ingredientRow}>
+            <Text style={styles.ingredientName}>{meal.dish_name}</Text>
+            <Text style={styles.ingredientMeta}>{meal.meal_type} · {meal.calories} kcal</Text>
+          </View>)}
+        </View>}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  diaryCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginTop: 14, borderWidth: 1, borderColor: Colors.borderSubtle },
   container: {
     flex: 1,
     backgroundColor: Colors.background,

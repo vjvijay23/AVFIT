@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
@@ -17,49 +20,114 @@ import {
   Plus,
   Sparkles,
 } from 'lucide-react-native';
+import { BackendApi } from '../services/backendApi';
 
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
-  const [posts, setPosts] = useState([
-    {
-      id: '1',
-      author: 'Maya Lin',
-      timeAgo: '2h ago',
-      avatarEmoji: '🏃‍♀️',
-      badge: 'Stretch & Recovery Done',
-      content: 'Completed the 30-min mobility stretch routine! Heart rate stayed at a steady 94 bpm. Feeling grounded and rejuvenated 🌿✨',
-      stats: '140 kcal • 30 mins',
-      likes: 24,
-      comments: 6,
-      hasLiked: false,
-    },
-    {
-      id: '2',
-      author: 'David Chen',
-      timeAgo: '4h ago',
-      avatarEmoji: '🥗',
-      badge: 'AI Nutrition Scan',
-      content: 'Scanned post-workout meal with Gemini AI. 44g protein, salmon & quinoa bowl logged in 3 seconds! 🥑🐟',
-      stats: '540 kcal • 44g Protein',
-      likes: 19,
-      comments: 4,
-      hasLiked: true,
-    },
-  ]);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [feedError, setFeedError] = useState('');
+  const [challenges, setChallenges] = useState<Array<Record<string, any>>>([]);
+  const [showComposer, setShowComposer] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [commentsByPost, setCommentsByPost] = useState<Record<string, Array<Record<string, any>>>>({});
+  const [commentDraft, setCommentDraft] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
 
-  const toggleLike = (id: string) => {
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id === id) {
-          return {
-            ...p,
-            hasLiked: !p.hasLiked,
-            likes: p.hasLiked ? p.likes - 1 : p.likes + 1,
-          };
-        }
-        return p;
-      })
-    );
+  const loadPosts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await BackendApi.getCommunityPosts();
+      setPosts(response.posts.map((post) => ({
+        id: post.id,
+        author: post.full_name || 'AVFIT Athlete',
+        timeAgo: new Date(post.created_at).toLocaleString(),
+        avatarEmoji: post.avatar_url || '🏃‍♂️',
+        badge: String(post.post_type || 'general').replaceAll('_', ' '),
+        content: post.content,
+        stats: '',
+        likes: Number(post.likes_count || 0),
+        comments: Number(post.comments_count || 0),
+        hasLiked: Boolean(post.has_liked),
+      })));
+      setFeedError('');
+    } catch (error: any) {
+      setFeedError(error?.message || 'Could not load the community feed.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadPosts(); }, [loadPosts]);
+
+  useEffect(() => {
+    BackendApi.getChallenges().then((result) => setChallenges(result.challenges)).catch(() => setChallenges([]));
+  }, []);
+
+  const publishPost = async () => {
+    const content = draft.trim();
+    if (!content || posting) return;
+    setPosting(true);
+    try {
+      await BackendApi.createCommunityPost(content);
+      setDraft('');
+      setShowComposer(false);
+      await loadPosts();
+    } catch (error: any) {
+      Alert.alert('Could not publish post', error?.message || 'Please try again.');
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const joinChallenge = async (challenge: Record<string, any>) => {
+    try {
+      await BackendApi.joinChallenge(challenge.id);
+      setChallenges((items) => items.map((item) => item.id === challenge.id ? { ...item, joined: true } : item));
+    } catch (error: any) {
+      Alert.alert('Could not join challenge', error?.message || 'Please try again.');
+    }
+  };
+
+  const toggleComments = async (postId: string) => {
+    if (expandedPostId === postId) { setExpandedPostId(null); return; }
+    setExpandedPostId(postId);
+    try {
+      const result = await BackendApi.getPostComments(postId);
+      setCommentsByPost((current) => ({ ...current, [postId]: result.comments }));
+    } catch (error: any) {
+      setFeedError(error?.message || 'Could not load comments.');
+    }
+  };
+
+  const publishComment = async (postId: string) => {
+    const content = commentDraft.trim();
+    if (!content || postingComment) return;
+    setPostingComment(true);
+    try {
+      await BackendApi.createPostComment(postId, content);
+      setCommentDraft('');
+      const refreshed = await BackendApi.getPostComments(postId);
+      setCommentsByPost((current) => ({ ...current, [postId]: refreshed.comments }));
+      setPosts((items) => items.map((item) => item.id === postId ? { ...item, comments: item.comments + 1 } : item));
+    } catch (error: any) {
+      Alert.alert('Could not add comment', error?.message || 'Please try again.');
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  const toggleLike = async (id: string) => {
+    const post = posts.find((item) => item.id === id);
+    if (!post || post.hasLiked) return;
+    try {
+      const result = await BackendApi.likeCommunityPost(id);
+      setPosts((prev) => prev.map((item) => item.id === id ? { ...item, hasLiked: true, likes: result.likesCount } : item));
+    } catch (error: any) {
+      setFeedError(error?.message || 'Could not send high-five.');
+    }
   };
 
   return (
@@ -73,11 +141,18 @@ export default function CommunityScreen() {
         {/* Top Header */}
         <View style={styles.topHeader}>
           <Text style={styles.screenTitle}>Fitness Community</Text>
-          <TouchableOpacity style={styles.shareBtn}>
+          <TouchableOpacity style={styles.shareBtn} onPress={() => setShowComposer((value) => !value)}>
             <Plus size={14} color="#FFFFFF" />
             <Text style={styles.shareBtnText}>Share</Text>
           </TouchableOpacity>
         </View>
+
+        {showComposer && <View style={styles.composer}>
+          <TextInput value={draft} onChangeText={setDraft} placeholder="Share an update with the community" multiline maxLength={2000} style={styles.composerInput} />
+          <TouchableOpacity style={styles.publishButton} onPress={publishPost} disabled={posting || !draft.trim()}>
+            <Text style={styles.publishButtonText}>{posting ? 'Posting…' : 'Publish'}</Text>
+          </TouchableOpacity>
+        </View>}
 
         {/* Challenge Announcement Banner */}
         <View style={styles.announcementBanner}>
@@ -85,12 +160,25 @@ export default function CommunityScreen() {
             <Sparkles size={18} color={Colors.primary} />
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.bannerTitle}>Weekly Step Blitz</Text>
-            <Text style={styles.bannerSubtitle}>1,420 members tracking consistency this week</Text>
+            <Text style={styles.bannerTitle}>{challenges[0]?.title || 'Community Challenges'}</Text>
+            <Text style={styles.bannerSubtitle}>{challenges[0] ? `${challenges[0].target_value} ${challenges[0].target_metric} · ends ${new Date(challenges[0].end_date).toLocaleDateString()}` : 'Join a challenge and track progress together.'}</Text>
           </View>
         </View>
 
+        {challenges.map((challenge) => <View key={challenge.id} style={styles.challengeCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.authorName}>{challenge.title}</Text>
+            <Text style={styles.postTime}>{challenge.description}</Text>
+          </View>
+          <TouchableOpacity style={styles.challengeButton} onPress={() => joinChallenge(challenge)} disabled={Boolean(challenge.joined)}>
+            <Text style={styles.challengeButtonText}>{challenge.joined ? 'Joined' : 'Join'}</Text>
+          </TouchableOpacity>
+        </View>)}
+
         {/* Post Stream */}
+        {isLoading && <ActivityIndicator color={Colors.primary} style={{ marginVertical: 24 }} />}
+        {!isLoading && feedError !== '' && <Text style={styles.postBody}>{feedError}</Text>}
+        {!isLoading && !feedError && posts.length === 0 && <Text style={styles.postBody}>No community posts yet. Sign in and share your first update.</Text>}
         {posts.map((post) => (
           <View key={post.id} style={styles.postCard}>
             <View style={styles.postAuthorRow}>
@@ -133,7 +221,7 @@ export default function CommunityScreen() {
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.actionItem}>
+              <TouchableOpacity style={styles.actionItem} onPress={() => toggleComments(post.id)}>
                 <MessageCircle size={16} color={Colors.textSecondary} />
                 <Text style={styles.actionText}>{post.comments} Comments</Text>
               </TouchableOpacity>
@@ -142,6 +230,15 @@ export default function CommunityScreen() {
                 <Share2 size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
+            {expandedPostId === post.id && <View style={styles.commentsBox}>
+              {(commentsByPost[post.id] || []).map((comment) => <Text key={comment.id} style={styles.postTime}><Text style={styles.authorName}>{comment.full_name || 'Athlete'}: </Text>{comment.content}</Text>)}
+              <View style={styles.commentComposer}>
+                <TextInput value={commentDraft} onChangeText={setCommentDraft} placeholder="Write a comment" maxLength={1000} style={styles.commentInput} />
+                <TouchableOpacity onPress={() => publishComment(post.id)} disabled={postingComment || !commentDraft.trim()}>
+                  <Text style={styles.publishButtonText}>{postingComment ? '…' : 'Send'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>}
           </View>
         ))}
 
@@ -151,6 +248,16 @@ export default function CommunityScreen() {
 }
 
 const styles = StyleSheet.create({
+  commentsBox: { borderTopWidth: 1, borderTopColor: Colors.borderSubtle, marginTop: 10, paddingTop: 10 },
+  commentComposer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
+  commentInput: { flex: 1, backgroundColor: Colors.background, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, color: Colors.textPrimary, fontSize: 12 },
+  composer: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: Colors.borderSubtle },
+  composerInput: { minHeight: 72, color: Colors.textPrimary, textAlignVertical: 'top', fontSize: 14 },
+  publishButton: { alignSelf: 'flex-end', backgroundColor: Colors.primary, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 8, marginTop: 8 },
+  publishButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  challengeCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: Colors.borderSubtle, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  challengeButton: { backgroundColor: Colors.primary, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 8 },
+  challengeButtonText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
   container: {
     flex: 1,
     backgroundColor: Colors.background,

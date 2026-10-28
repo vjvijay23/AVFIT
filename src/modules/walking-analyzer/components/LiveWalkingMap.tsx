@@ -35,8 +35,12 @@ export const LiveWalkingMap: React.FC<LiveWalkingMapProps> = ({
 
   // Initial map center
   const initialRegion: Region = {
-    latitude: currentLocation?.latitude || 37.7749,
-    longitude: currentLocation?.longitude || -122.4194,
+    latitude:
+      currentLocation?.latitude ||
+      (routeCoordinates.length > 0 ? routeCoordinates[0].latitude : 37.7749),
+    longitude:
+      currentLocation?.longitude ||
+      (routeCoordinates.length > 0 ? routeCoordinates[0].longitude : -122.4194),
     latitudeDelta: 0.005,
     longitudeDelta: 0.005,
   };

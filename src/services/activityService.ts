@@ -9,6 +9,7 @@ import {
 import { UserStore } from './userStore';
 import { AuthService } from './auth';
 import { AchievementService } from './achievements';
+import { BackendApi } from './backendApi';
 
 // Standard MET values for accurate caloric expenditure estimation
 const MET_VALUES: Record<SportType, number> = {
@@ -35,7 +36,23 @@ export const ActivityService = {
       createdAt: new Date().toISOString(),
     };
 
-    // 1. Add to isolated user store (this automatically updates user's cumulative stats)
+    const pace = this.calculatePace(activityData.activeDurationSeconds || activityData.durationSeconds, activityData.distanceKm);
+    const saved = await BackendApi.recordActivity({
+      userId,
+      sportType: activityData.sportType,
+      title: activity.title,
+      durationSec: activityData.durationSeconds,
+      distanceKm: activityData.distanceKm,
+      calories: activityData.caloriesBurned,
+      avgPace: pace.formatted,
+      elevationGainM: activityData.elevationGainMeters,
+      routeCoordinates: activityData.routeCoordinates,
+      startTime: activityData.startTime,
+      endTime: activityData.endTime,
+    });
+    activity.id = String(saved.activity.id || activity.id);
+
+    // Keep the current session's UI metrics in sync after the backend accepts the activity.
     UserStore.addActivity(activity);
 
     // 2. Fetch updated stats for milestone evaluation
@@ -63,6 +80,19 @@ export const ActivityService = {
    */
   async getUserActivities(userId?: string): Promise<RecordedActivity[]> {
     const targetUserId = userId || AuthService.getActiveUserId();
+    if (BackendApi.hasAuthToken() && targetUserId) {
+      const response = await BackendApi.getActivities(targetUserId, 100);
+      return response.activities.map((row) => ({
+        id: String(row.id), userId: String(row.user_id), title: String(row.title || 'Activity'),
+        sportType: row.sport_type || 'walking', startTime: row.start_time || row.created_at,
+        endTime: row.end_time || row.created_at, durationSeconds: Number(row.duration_sec || 0),
+        activeDurationSeconds: Number(row.duration_sec || 0), distanceKm: Number(row.distance_km || 0),
+        caloriesBurned: Number(row.calories || 0), avgPaceSecPerKm: paceSeconds(row.avg_pace),
+        avgSpeedKmh: row.avg_speed_kmh == null ? undefined : Number(row.avg_speed_kmh),
+        elevationGainMeters: row.elevation_gain_m == null ? undefined : Number(row.elevation_gain_m),
+        routeCoordinates: [], privacy: 'private', createdAt: row.created_at || new Date().toISOString(),
+      }));
+    }
     return UserStore.getActivities(targetUserId);
   },
 
@@ -71,6 +101,19 @@ export const ActivityService = {
    */
   async getUserStats(userId?: string): Promise<UserFitnessStats> {
     const targetUserId = userId || AuthService.getActiveUserId();
+    if (BackendApi.hasAuthToken()) {
+      const dashboard = await BackendApi.getDashboard() as any;
+      const activity = dashboard.activity || {};
+      const targets = dashboard.targets || {};
+      const stored = UserStore.getStats(targetUserId);
+      return {
+        ...stored,
+        todaySteps: Number(activity.steps || 0),
+        todayStepGoal: Number(targets.daily_step_goal || stored.todayStepGoal),
+        todayCalories: Number(activity.calories_burned || 0),
+        totalCaloriesBurned: Number(activity.calories_burned || 0) + stored.totalCaloriesBurned,
+      };
+    }
     return UserStore.getStats(targetUserId);
   },
 
@@ -287,3 +330,9 @@ export const ActivityService = {
     return data;
   },
 };
+
+function paceSeconds(value: unknown): number | undefined {
+  if (typeof value !== 'string') return undefined;
+  const match = value.match(/^(\d+):(\d{2})/);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : undefined;
+}

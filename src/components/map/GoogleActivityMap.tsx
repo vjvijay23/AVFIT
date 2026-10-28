@@ -35,10 +35,14 @@ export default function GoogleActivityMap({
   const [hasMapError, setHasMapError] = useState(false);
   const [autoCenter, setAutoCenter] = useState(true);
 
-  // Initial region or fallback to San Francisco / current coordinates
+  // Initial region centered on current location or start of route coordinates
   const initialRegion: Region = {
-    latitude: currentLocation?.latitude || 37.7749,
-    longitude: currentLocation?.longitude || -122.4194,
+    latitude:
+      currentLocation?.latitude ||
+      (routeCoordinates.length > 0 ? routeCoordinates[0].latitude : 37.7749),
+    longitude:
+      currentLocation?.longitude ||
+      (routeCoordinates.length > 0 ? routeCoordinates[0].longitude : -122.4194),
     latitudeDelta: 0.006,
     longitudeDelta: 0.006,
   };
@@ -57,6 +61,19 @@ export default function GoogleActivityMap({
       );
     }
   }, [currentLocation, autoCenter]);
+
+  // Automatically fit map viewport to recorded route coordinates when not in active tracking mode
+  useEffect(() => {
+    if (mapRef.current && routeCoordinates.length > 1 && !isTracking) {
+      mapRef.current.fitToCoordinates(
+        routeCoordinates.map((pt) => ({ latitude: pt.latitude, longitude: pt.longitude })),
+        {
+          edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
+          animated: true,
+        }
+      );
+    }
+  }, [routeCoordinates, isTracking]);
 
   // Handle manual recenter button click
   const handleRecenter = useCallback(() => {

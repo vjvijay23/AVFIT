@@ -25,6 +25,7 @@ import { ActivityService } from '../../services/activityService';
 import { AuthService } from '../../services/auth';
 import { UserStore } from '../../services/userStore';
 import TrophyUnlockModal from '../../components/achievements/TrophyUnlockModal';
+import GoogleActivityMap from '../../components/map/GoogleActivityMap';
 import InbuiltRouteMap from '../../components/map/InbuiltRouteMap';
 import KilometerSplitsTable from '../../components/activity/KilometerSplitsTable';
 import RaceGapChart from '../../components/activity/RaceGapChart';
@@ -211,12 +212,14 @@ export default function ActivitySummaryScreen({ route, navigation }: any) {
           />
         </View>
 
-        {/* INBUILT ROUTE MAP */}
+        {/* GOOGLE MAP ROUTE PREVIEW */}
         <View style={styles.mapContainerCard}>
-          <InbuiltRouteMap
-            routePoints={routePoints}
+          <GoogleActivityMap
+            routeCoordinates={routePoints}
+            currentLocation={routePoints.length > 0 ? routePoints[routePoints.length - 1] : null}
+            isTracking={false}
+            status="finished"
             height={260}
-            distanceKm={distanceKm}
           />
         </View>
 

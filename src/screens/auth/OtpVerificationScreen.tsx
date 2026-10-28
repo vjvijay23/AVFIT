@@ -30,6 +30,7 @@ interface OtpVerificationScreenProps {
       countryCode?: string;
       authMode?: 'login' | 'signup';
       pendingProfile?: any;
+      developmentOtp?: string;
     };
   };
   navigation?: any;
@@ -44,10 +45,11 @@ export default function OtpVerificationScreen({
   onBackToPhone,
 }: OtpVerificationScreenProps) {
   const insets = useSafeAreaInsets();
-  const phone = route?.params?.phone || '+1 (555) 019-2834';
+  const phone = route?.params?.phone || '';
   const countryCode = route?.params?.countryCode || '+1';
   const authMode = route?.params?.authMode || 'signup';
   const pendingProfile = route?.params?.pendingProfile;
+  const [developmentOtp, setDevelopmentOtp] = useState(route?.params?.developmentOtp);
 
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(60);
@@ -55,7 +57,9 @@ export default function OtpVerificationScreen({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(
-    'Verification code sent! (Sandbox mode: Use 123456 to test)'
+    route?.params?.developmentOtp
+      ? `Development mock OTP: ${route.params.developmentOtp}. No SMS was sent.`
+      : 'Enter the 6-digit code sent by SMS to your phone.'
   );
 
   const inputRefs = useRef<Array<TextInput | null>>([]);
@@ -132,7 +136,7 @@ export default function OtpVerificationScreen({
       }
     } catch (err: any) {
       setErrorMessage(
-        err.message || 'The verification code entered is incorrect or expired. Try 123456.'
+        err.message || 'The verification code is incorrect or expired. Request a new code and try again.'
       );
     } finally {
       setIsLoading(false);
@@ -147,10 +151,13 @@ export default function OtpVerificationScreen({
     setSuccessNotice(null);
 
     try {
-      await AuthService.sendPhoneOtp({ phone, countryCode });
+      const response = await AuthService.sendPhoneOtp({ phone, countryCode });
+      setDevelopmentOtp(response.developmentOtp);
       setCountdown(60);
       setCanResend(false);
-      setSuccessNotice('New verification code dispatched to your phone!');
+      setSuccessNotice(response.developmentOtp
+        ? `Development mock OTP: ${response.developmentOtp}. No SMS was sent.`
+        : 'A new verification code was sent by SMS.');
       setOtpDigits(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } catch (err: any) {
@@ -185,7 +192,7 @@ export default function OtpVerificationScreen({
 
           <Text style={styles.title}>Enter 6-Digit OTP</Text>
           <Text style={styles.subtitle}>
-            We've sent a one-time verification code to:
+            {developmentOtp ? 'Use the development code shown below:' : "We've sent a one-time verification code to:"}
           </Text>
 
           {/* Phone Display with Edit */}
@@ -282,7 +289,7 @@ export default function OtpVerificationScreen({
         <View style={styles.securityRow}>
           <ShieldCheck size={16} color={Colors.primary} />
           <Text style={styles.securityText}>
-            Protected by Supabase Auth with SMS Rate-Limiting & Anti-Abuse
+            Your code is checked by the SMS verification provider and is never stored by AVFIT.
           </Text>
         </View>
       </ScrollView>

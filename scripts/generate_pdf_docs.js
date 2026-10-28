@@ -702,7 +702,7 @@ RootNavigator (NativeStackNavigator)
     1. <strong>60-Second Cooldown:</strong> Enforces an unskippable 60-second hardware countdown before any resend SMS request can be triggered, preventing SMS toll fraud.<br>
     2. <strong>Regulatory Carrier Consent:</strong> Explicit notice displayed prior to OTP dispatch: <em>"By proceeding, you agree to receive SMS verification codes. Standard carrier rates may apply."</em><br>
     3. <strong>Auto-Advancing Cells:</strong> Six discrete text inputs that detect single-digit input, advance cursor focus to the next cell immediately, and cleanly handle backspaces.<br>
-    4. <strong>Sandbox Test Bypass:</strong> Safe pre-configured developer test numbers (e.g. <code>+1 555-000-1111</code>) with static verification code <code>123456</code> for local and automated testing.
+    4. <strong>Provider-Managed Codes:</strong> Twilio Verify generates, delivers, expires, and validates the SMS code. AVFIT never returns or stores a fixed OTP.
   </div>
 
   <h2>4.2 Supabase OTP Implementation Contract</h2>
