@@ -71,7 +71,15 @@ export async function buildApp() {
     try { redisStatus = (await redis.ping()) === 'PONG'; } catch { /* health response reports dependency state */ }
     const healthy = postgres && redisStatus;
     if (!healthy) reply.status(503);
-    return { status: healthy ? 'healthy' : 'degraded', service: 'avfit-backend', timestamp: new Date().toISOString(), postgres, redis: redisStatus, otpProvider: config.otpProvider };
+    return {
+      status: healthy ? 'healthy' : 'degraded',
+      service: 'avfit-backend',
+      version: process.env.RENDER_GIT_COMMIT || 'local',
+      timestamp: new Date().toISOString(),
+      postgres,
+      redis: redisStatus,
+      otpProvider: config.otpProvider,
+    };
   });
 
   // 5. Register Subsystem Routes

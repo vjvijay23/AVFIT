@@ -33,7 +33,8 @@ export async function authRoutes(fastify: FastifyInstance) {
         const message = err.message || '';
         const unavailable = /SMS verification (is not configured|service rejected)|Twilio authentication failed|MSG91 (verification is not configured|authentication failed|could not validate)|Could not reach (the SMS|MSG91)/i.test(message);
         const status = unavailable ? 503 : /Invalid or expired/.test(message) ? 401 : 400;
-        return reply.status(status).send({ error: message });
+        const providerDiagnosticCode = typeof err.providerDiagnosticCode === 'string' ? err.providerDiagnosticCode : undefined;
+        return reply.status(status).send({ error: message, ...(providerDiagnosticCode ? { providerDiagnosticCode } : {}) });
       }
     }
   );
