@@ -236,6 +236,32 @@ test('MSG91 verification rejects a verified token for a different phone before r
   }
 });
 
+test('MSG91 invalid access-token responses are reported as invalid OTP instead of service outages', async () => {
+  const previous = { provider: config.otpProvider, authKey: config.msg91AuthKey };
+  config.otpProvider = 'twilio';
+  config.msg91AuthKey = 'mock-msg91-authkey';
+  let queryCount = 0;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ type: 'error', message: 'Invalid access token' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })) as typeof fetch;
+  queryHandler = async () => { queryCount += 1; return { rows: [], rowCount: 0 }; };
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/otp/verify',
+      payload: { phone: mockPhone, accessToken: 'expired-msg91-access-token', authMode: 'signup' },
+    });
+    assert.equal(response.statusCode, 401);
+    assert.match(response.json().error, /Invalid or expired/);
+    assert.equal(queryCount, 0);
+  } finally {
+    config.otpProvider = previous.provider;
+    config.msg91AuthKey = previous.authKey;
+  }
+});
+
 test('MSG91 widget user-exists validation accepts valid phone identifiers without exposing accounts', async () => {
   const response = await app.inject({ method: 'GET', url: '/api/v1/auth/otp/user-exists?identifier=919876543210' });
   assert.equal(response.statusCode, 200);
