@@ -156,7 +156,7 @@ export default function ActivityTrackerScreen({ navigation }: any) {
             {/* GPS Signal Status Badge */}
             <View style={styles.gpsStatusPill}>
               <View style={styles.gpsGreenDot} />
-              <Text style={styles.gpsStatusText}>GPS Ready</Text>
+              <Text style={styles.gpsStatusText}>GPS CHECK ON START</Text>
             </View>
           </View>
 

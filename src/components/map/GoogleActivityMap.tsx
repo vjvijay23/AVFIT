@@ -32,6 +32,7 @@ export default function GoogleActivityMap({
 }: GoogleActivityMapProps) {
   const mapRef = useRef<MapView | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const [hasMapError, setHasMapError] = useState(false);
   const [autoCenter, setAutoCenter] = useState(true);
 
@@ -49,7 +50,7 @@ export default function GoogleActivityMap({
 
   // Center map on user location as they move (if autoCenter is enabled)
   useEffect(() => {
-    if (mapRef.current && currentLocation && autoCenter) {
+    if (mapRef.current && currentLocation && autoCenter && mapReady) {
       mapRef.current.animateToRegion(
         {
           latitude: currentLocation.latitude,
@@ -60,7 +61,15 @@ export default function GoogleActivityMap({
         500
       );
     }
-  }, [currentLocation, autoCenter]);
+  }, [currentLocation, autoCenter, mapReady]);
+
+  // If the native map never finishes loading (for example, a Maps SDK key/config issue),
+  // switch to the in-app route map instead of leaving a blank map surface.
+  useEffect(() => {
+    if (mapLoaded || hasMapError) return;
+    const timeout = setTimeout(() => setHasMapError(true), 7000);
+    return () => clearTimeout(timeout);
+  }, [mapLoaded, hasMapError]);
 
   // Automatically fit map viewport to recorded route coordinates when not in active tracking mode
   useEffect(() => {
@@ -75,18 +84,8 @@ export default function GoogleActivityMap({
     }
   }, [routeCoordinates, isTracking]);
 
-  // Avoid showing a fabricated default region (San Francisco) while the device has no GPS fix.
-  if (!currentLocation && routeCoordinates.length === 0) {
-    return (
-      <View style={[styles.container, { height: height as any }, styles.waitingForGps]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Waiting for your GPS location…</Text>
-        <Text style={styles.loadingSub}>The map and route will appear when the device reports a real location.</Text>
-      </View>
-    );
-  }
-
-  // Handle manual recenter button click
+  // Handle manual recenter button click. Keep hooks above conditional returns so
+  // the hook order stays stable when the first GPS fix arrives.
   const handleRecenter = useCallback(() => {
     setAutoCenter(true);
     if (mapRef.current && currentLocation) {
@@ -102,6 +101,17 @@ export default function GoogleActivityMap({
     }
     if (onRecenter) onRecenter();
   }, [currentLocation, onRecenter]);
+
+  // Avoid showing a fabricated default region (San Francisco) while the device has no GPS fix.
+  if (!currentLocation && routeCoordinates.length === 0) {
+    return (
+      <View style={[styles.container, { height: height as any }, styles.waitingForGps]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Waiting for your GPS location…</Text>
+        <Text style={styles.loadingSub}>The map and route will appear when the device reports a real location.</Text>
+      </View>
+    );
+  }
 
   // Render fallback map if native Google Maps encounters an environment issue
   if (hasMapError) {
@@ -142,6 +152,7 @@ export default function GoogleActivityMap({
         showsScale={true}
         showsMyLocationButton={false}
         onMapReady={() => setMapReady(true)}
+        onMapLoaded={() => { setMapLoaded(true); setMapReady(true); }}
         onTouchStart={() => setAutoCenter(false)} // User is panning map
       >
         {/* Live Route Polyline */}

@@ -40,6 +40,7 @@ export const LiveWalkingAnalyzerScreen: React.FC<LiveWalkingAnalyzerScreenProps>
     status,
     telemetry,
     permissionState,
+    errorMessage,
     lastSummary,
     startTracking,
     pauseTracking,
@@ -91,6 +92,12 @@ export const LiveWalkingAnalyzerScreen: React.FC<LiveWalkingAnalyzerScreenProps>
           <BatteryCharging size={16} color={STRAVA_ORANGE} />
         </TouchableOpacity>
       </View>
+
+      {!!errorMessage && (
+        <View style={[styles.errorBanner, { top: insets.top + 64 }]}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      )}
 
       {/* OEM Battery Kill / Permissions Notice Banner */}
       {showBatteryBanner &&
@@ -340,6 +347,19 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
   },
+  errorBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 35,
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  errorText: { color: '#991B1B', fontSize: 12, lineHeight: 17, fontWeight: '700' },
   hudWrapper: {
     position: 'absolute',
     bottom: 0,

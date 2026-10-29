@@ -19,7 +19,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
       } catch (err: any) {
         const message = err.message || '';
-        const unavailable = /MSG91 (verification is not configured|authentication failed|could not validate)|Could not reach MSG91/i.test(message);
+        const unavailable = /MSG91 (verification is not configured|authentication failed|could not validate|blocked verification)/i.test(message) || /Could not reach MSG91/i.test(message);
         const status = unavailable ? 503 : /Invalid or expired|MSG91 rejected the verification token|MSG91 access token is required|phone number verified by MSG91 does not match/i.test(message) ? 401 : 400;
         const providerDiagnosticCode = typeof err.providerDiagnosticCode === 'string' ? err.providerDiagnosticCode : undefined;
         return reply.status(status).send({ error: message, ...(providerDiagnosticCode ? { providerDiagnosticCode } : {}) });

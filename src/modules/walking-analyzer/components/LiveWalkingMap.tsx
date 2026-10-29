@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { Navigation, Crosshair } from 'lucide-react-native';
 import { WalkingPoint } from '../types';
+import InbuiltRouteMap from '../../../components/map/InbuiltRouteMap';
+import { sampleRouteForRendering } from '../../../utils/routeRendering';
 
 interface LiveWalkingMapProps {
   currentLocation: WalkingPoint | null;
@@ -32,6 +34,27 @@ export const LiveWalkingMap: React.FC<LiveWalkingMapProps> = ({
 }) => {
   const mapRef = useRef<MapView | null>(null);
   const [autoFollow, setAutoFollow] = useState(true);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [useRouteMapFallback, setUseRouteMapFallback] = useState(false);
+  const renderRouteCoordinates = useMemo(() => sampleRouteForRendering(routeCoordinates), [routeCoordinates]);
+  const mapPolylineCoordinates = useMemo(
+    () => renderRouteCoordinates.map(({ latitude, longitude }) => ({ latitude, longitude })),
+    [renderRouteCoordinates],
+  );
+  const fallbackRoutePoints = useMemo(() => renderRouteCoordinates.map((point) => ({
+    latitude: point.latitude,
+    longitude: point.longitude,
+    altitude: point.altitude ?? undefined,
+    timestamp: point.timestamp,
+    speed: point.speed ?? undefined,
+    accuracy: point.accuracy,
+  })), [renderRouteCoordinates]);
+
+  useEffect(() => {
+    if (mapLoaded || useRouteMapFallback) return;
+    const timeout = setTimeout(() => setUseRouteMapFallback(true), 7000);
+    return () => clearTimeout(timeout);
+  }, [mapLoaded, useRouteMapFallback]);
 
   // Initial map center
   const initialRegion: Region = {
@@ -78,6 +101,29 @@ export const LiveWalkingMap: React.FC<LiveWalkingMapProps> = ({
     onRecenter?.();
   }, [currentLocation, onRecenter]);
 
+  if (useRouteMapFallback) {
+    return (
+      <View style={[styles.container, { height: height as any }]}>
+        <InbuiltRouteMap
+          routePoints={fallbackRoutePoints}
+          currentLocation={currentLocation ? {
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            altitude: currentLocation.altitude ?? undefined,
+            timestamp: currentLocation.timestamp,
+            speed: currentLocation.speed ?? undefined,
+            accuracy: currentLocation.accuracy,
+          } : null}
+          isLiveTracking={isTracking}
+          height={typeof height === 'number' ? height : 260}
+        />
+        <View style={styles.fallbackNotice}>
+          <Text style={styles.fallbackNoticeText}>Map fallback • actual GPS points only</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { height: height as any }]}>
       {/* GPS Acquisition Loading State */}
@@ -100,15 +146,14 @@ export const LiveWalkingMap: React.FC<LiveWalkingMapProps> = ({
         showsCompass={true}
         showsScale={true}
         showsMyLocationButton={false}
+        onMapReady={() => setMapLoaded(true)}
+        onMapLoaded={() => setMapLoaded(true)}
         onTouchStart={() => setAutoFollow(false)}
       >
         {/* Strava Orange Live Polyline */}
-        {routeCoordinates.length > 1 && (
+        {renderRouteCoordinates.length > 1 && (
           <Polyline
-            coordinates={routeCoordinates.map((pt) => ({
-              latitude: pt.latitude,
-              longitude: pt.longitude,
-            }))}
+            coordinates={mapPolylineCoordinates}
             strokeColor={STRAVA_ORANGE}
             strokeWidth={5}
             lineCap="round"
@@ -117,11 +162,11 @@ export const LiveWalkingMap: React.FC<LiveWalkingMapProps> = ({
         )}
 
         {/* Start Position Pin */}
-        {routeCoordinates.length > 0 && (
+        {renderRouteCoordinates.length > 0 && (
           <Marker
             coordinate={{
-              latitude: routeCoordinates[0].latitude,
-              longitude: routeCoordinates[0].longitude,
+              latitude: renderRouteCoordinates[0].latitude,
+              longitude: renderRouteCoordinates[0].longitude,
             }}
             title="Start Point"
             anchor={{ x: 0.5, y: 0.5 }}
@@ -197,6 +242,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 280,
   },
+  fallbackNotice: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+  },
+  fallbackNoticeText: { color: '#334155', fontSize: 10, fontWeight: '700' },
   recenterButton: {
     position: 'absolute',
     top: 16,

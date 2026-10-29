@@ -12,6 +12,7 @@ export interface UseWalkingTrackerReturn {
   status: TrackerStatus;
   telemetry: WalkingTelemetry;
   permissionState: PermissionFlowState;
+  errorMessage: string | null;
   lastSummary: WalkingSummary | null;
   startTracking: () => Promise<boolean>;
   pauseTracking: () => Promise<void>;
@@ -27,6 +28,7 @@ export function useWalkingTracker(): UseWalkingTrackerReturn {
     WalkingForegroundService.getTelemetrySnapshot()
   );
   const [lastSummary, setLastSummary] = useState<WalkingSummary | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(WalkingForegroundService.getErrorMessage());
   const [permissionState, setPermissionState] = useState<PermissionFlowState>({
     fineLocation: 'undetermined',
     notification: 'undetermined',
@@ -44,6 +46,8 @@ export function useWalkingTracker(): UseWalkingTrackerReturn {
       if (isMountedRef.current) {
         setPermissionState(state);
       }
+    }).catch(() => {
+      if (isMountedRef.current) setErrorMessage('Could not check location permissions. Open Android Settings and allow AVFIT location access.');
     });
 
     // Subscribe to real-time telemetry stream from Foreground Service
@@ -51,6 +55,7 @@ export function useWalkingTracker(): UseWalkingTrackerReturn {
       if (isMountedRef.current) {
         setTelemetry(updatedTelemetry);
         setStatus(WalkingForegroundService.getStatus());
+        setErrorMessage(WalkingForegroundService.getErrorMessage());
       }
     });
 
@@ -61,11 +66,24 @@ export function useWalkingTracker(): UseWalkingTrackerReturn {
   }, []);
 
   const requestPermissions = useCallback(async (): Promise<PermissionFlowState> => {
-    const updated = await PermissionManager.requestSequentialPermissions();
-    if (isMountedRef.current) {
-      setPermissionState(updated);
+    try {
+      const updated = await PermissionManager.requestSequentialPermissions();
+      if (isMountedRef.current) {
+        setPermissionState(updated);
+        setErrorMessage(updated.canStartForegroundTracking ? null : 'Allow precise location and notifications to start GPS tracking.');
+      }
+      return updated;
+    } catch {
+      const denied: PermissionFlowState = {
+        fineLocation: 'denied', notification: 'denied', backgroundLocation: 'undetermined',
+        isBatteryOptimizationExempt: false, canStartForegroundTracking: false,
+      };
+      if (isMountedRef.current) {
+        setPermissionState(denied);
+        setErrorMessage('Could not request location permissions. Check Android Settings and retry.');
+      }
+      return denied;
     }
-    return updated;
   }, []);
 
   const openBatterySettings = useCallback(async (): Promise<void> => {
@@ -80,13 +98,22 @@ export function useWalkingTracker(): UseWalkingTrackerReturn {
     }
 
     if (!currentPerms.canStartForegroundTracking) {
+      setErrorMessage('Allow precise location and notifications before starting a walk.');
+      setStatus('error');
       return false;
     }
 
     setLastSummary(null);
-    await WalkingForegroundService.startTracking();
-    setStatus(WalkingForegroundService.getStatus());
-    return true;
+    setErrorMessage(null);
+    try {
+      await WalkingForegroundService.startTracking();
+      setStatus(WalkingForegroundService.getStatus());
+      return true;
+    } catch (error: any) {
+      setErrorMessage(error?.message || WalkingForegroundService.getErrorMessage() || 'Could not start GPS tracking. Please retry.');
+      setStatus('error');
+      return false;
+    }
   }, [permissionState, requestPermissions]);
 
   const pauseTracking = useCallback(async (): Promise<void> => {
@@ -112,6 +139,7 @@ export function useWalkingTracker(): UseWalkingTrackerReturn {
     status,
     telemetry,
     permissionState,
+    errorMessage,
     lastSummary,
     startTracking,
     pauseTracking,

@@ -15,6 +15,7 @@ import {
   formatPace,
   DEFAULT_FILTER_CONFIG,
 } from './HaversineCalculator';
+import { sampleRouteForRendering } from '../../../utils/routeRendering';
 
 type TelemetryListener = (telemetry: WalkingTelemetry) => void;
 
@@ -25,6 +26,8 @@ class WalkingForegroundServiceManager {
 
   // Route & Metrics state
   private routeCoordinates: WalkingPoint[] = [];
+  private renderedRouteCoordinates: WalkingPoint[] = [];
+  private renderedRoutePointCount = 0;
   private lastValidPoint: WalkingPoint | null = null;
   private totalDistanceMeters = 0;
   private startTimestamp = 0;
@@ -35,12 +38,17 @@ class WalkingForegroundServiceManager {
   private pointsRecorded = 0;
   private pointsRejected = 0;
   private maxSpeedMps = 0;
+  private errorMessage: string | null = null;
 
   // Moving pace buffer for rolling window pace calculations (last 20 seconds)
   private paceBuffer: { timestamp: number; distanceMeters: number }[] = [];
 
   public getStatus(): TrackerStatus {
     return this.status;
+  }
+
+  public getErrorMessage(): string | null {
+    return this.errorMessage;
   }
 
   public subscribe(listener: TelemetryListener): () => void {
@@ -81,7 +89,10 @@ class WalkingForegroundServiceManager {
 
     return {
       currentLocation: this.lastValidPoint,
-      routeCoordinates: [...this.routeCoordinates],
+      // Keep live map updates bounded; finishTracking still returns the full route.
+      // Reuse the bounded route snapshot between GPS fixes. The display map does not
+      // need a fresh array copy every second while the background timer updates pace.
+      routeCoordinates: this.renderedRouteCoordinates,
       totalDistanceMeters: Math.round(this.totalDistanceMeters * 10) / 10,
       totalDistanceKm: Math.round((this.totalDistanceMeters / 1000) * 100) / 100,
       elapsedSeconds,
@@ -106,6 +117,7 @@ class WalkingForegroundServiceManager {
     }
 
     this.status = 'starting';
+    this.errorMessage = null;
     this.resetState();
     this.startTimestamp = Date.now();
 
@@ -125,28 +137,53 @@ class WalkingForegroundServiceManager {
       },
     };
 
-    // 2. Start Android Persistent Foreground Service
-    await BackgroundService.start(this.backgroundTaskLoop.bind(this), bgOptions);
+    try {
+      // 2. Start Android Persistent Foreground Service
+      await BackgroundService.start(this.backgroundTaskLoop.bind(this), bgOptions);
 
-    // 3. Register high-accuracy Fused Location Provider watch
-    this.watchId = Geolocation.watchPosition(
-      this.handleIncomingLocation.bind(this),
-      (error: GeoError) => {
-        // Location provider error (e.g. GPS toggled off)
-      },
-      {
-        enableHighAccuracy: true,
-        distanceFilter: 3,           // 3 meters to balance fidelity and battery
-        interval: 2000,              // 2s standard interval
-        fastestInterval: 1000,       // 1s fastest interval
-        showLocationDialog: false,
-        forceRequestLocation: true,
-        useSignificantChanges: false,
-        showsBackgroundLocationIndicator: true,
+      // 3. Register high-accuracy Fused Location Provider watch
+      this.watchId = Geolocation.watchPosition(
+        this.handleIncomingLocation.bind(this),
+        (error: GeoError) => this.handleLocationError(error),
+        {
+          enableHighAccuracy: true,
+          distanceFilter: 3,
+          interval: 2000,
+          fastestInterval: 1000,
+          showLocationDialog: false,
+          forceRequestLocation: true,
+          useSignificantChanges: false,
+          showsBackgroundLocationIndicator: true,
+        }
+      );
+
+      this.status = 'tracking';
+      this.notifyListeners();
+    } catch {
+      this.errorMessage = 'Could not start GPS tracking. Allow location and notification access, enable device location, then retry.';
+      this.status = 'error';
+      if (this.watchId !== null) {
+        Geolocation.clearWatch(this.watchId);
+        this.watchId = null;
       }
-    );
+      if (BackgroundService.isRunning()) {
+        try { await BackgroundService.stop(); } catch { /* Preserve the original start failure. */ }
+      }
+      this.notifyListeners();
+      throw new Error(this.errorMessage);
+    }
+  }
 
-    this.status = 'tracking';
+  private handleLocationError(error: GeoError): void {
+    this.errorMessage = error.code === 1
+      ? 'Location permission was denied. Allow AVFIT location access in Android Settings and retry.'
+      : 'The device could not provide GPS. Turn on Location and retry outdoors.';
+    this.status = 'error';
+    if (this.watchId !== null) {
+      Geolocation.clearWatch(this.watchId);
+      this.watchId = null;
+    }
+    if (BackgroundService.isRunning()) void BackgroundService.stop().catch(() => undefined);
     this.notifyListeners();
   }
 
@@ -221,6 +258,7 @@ class WalkingForegroundServiceManager {
       this.lastValidPoint = newPoint;
       this.routeCoordinates.push(newPoint);
       this.pointsRecorded += 1;
+      this.refreshRenderedRoute();
 
       // Add to rolling pace buffer
       this.paceBuffer.push({
@@ -236,6 +274,12 @@ class WalkingForegroundServiceManager {
     }
 
     this.notifyListeners();
+  }
+
+  private refreshRenderedRoute(): void {
+    if (this.renderedRoutePointCount === this.routeCoordinates.length) return;
+    this.renderedRouteCoordinates = sampleRouteForRendering(this.routeCoordinates);
+    this.renderedRoutePointCount = this.routeCoordinates.length;
   }
 
   /**
@@ -349,7 +393,10 @@ class WalkingForegroundServiceManager {
    * Resets internal tracking telemetry.
    */
   private resetState(): void {
+    this.errorMessage = null;
     this.routeCoordinates = [];
+    this.renderedRouteCoordinates = [];
+    this.renderedRoutePointCount = 0;
     this.lastValidPoint = null;
     this.totalDistanceMeters = 0;
     this.startTimestamp = 0;

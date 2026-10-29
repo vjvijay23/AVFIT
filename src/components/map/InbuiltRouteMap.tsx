@@ -19,6 +19,7 @@ import Svg, {
 } from 'react-native-svg';
 import { GPSPoint } from '../../types';
 import { Colors } from '../../theme/colors';
+import { sampleRouteForRendering } from '../../utils/routeRendering';
 import {
   Layers,
   Maximize2,
@@ -60,25 +61,22 @@ export default function InbuiltRouteMap({
 
   const mapWidth = SCREEN_WIDTH - 32;
   const mapHeight = height;
+  const renderRoutePoints = useMemo(() => sampleRouteForRendering(routePoints || []), [routePoints]);
 
   // Calculate coordinates bounds and projection
   const { pathString, projectedPoints, centerLat, centerLon, zoomLevel } = useMemo(() => {
-    // If no route points, provide a default scenic route loop
-    const points: GPSPoint[] =
-      routePoints && routePoints.length > 1
-        ? routePoints
-        : [
-            { latitude: 56.002, longitude: -3.784, timestamp: 0 },
-            { latitude: 56.004, longitude: -3.787, timestamp: 1 },
-            { latitude: 56.007, longitude: -3.789, timestamp: 2 },
-            { latitude: 56.011, longitude: -3.785, timestamp: 3 },
-            { latitude: 56.013, longitude: -3.78, timestamp: 4 },
-            { latitude: 56.012, longitude: -3.774, timestamp: 5 },
-            { latitude: 56.008, longitude: -3.771, timestamp: 6 },
-            { latitude: 56.005, longitude: -3.773, timestamp: 7 },
-            { latitude: 56.003, longitude: -3.778, timestamp: 8 },
-            { latitude: 56.002, longitude: -3.784, timestamp: 9 },
-          ];
+    // Fallback map must only draw coordinates that came from the device or saved activity.
+    const points: GPSPoint[] = renderRoutePoints.length ? renderRoutePoints : currentLocation ? [currentLocation] : [];
+
+    if (points.length === 0) {
+      return {
+        pathString: '',
+        projectedPoints: [] as Array<{ x: number; y: number; lat: number; lon: number; index: number }>,
+        centerLat: 0,
+        centerLon: 0,
+        zoomLevel: 14,
+      };
+    }
 
     const lats = points.map((p) => p.latitude);
     const lons = points.map((p) => p.longitude);
@@ -113,7 +111,7 @@ export default function InbuiltRouteMap({
       centerLon: (minLon + maxLon) / 2,
       zoomLevel: 14,
     };
-  }, [routePoints, mapWidth, mapHeight]);
+  }, [renderRoutePoints, currentLocation, mapWidth, mapHeight]);
 
   const startPoint = projectedPoints[0];
   const endPoint = projectedPoints[projectedPoints.length - 1];
@@ -134,8 +132,9 @@ export default function InbuiltRouteMap({
     return markers;
   }, [projectedPoints, distanceKm]);
 
-  // OpenStreetMap / CartoDB tile calculations
+  // OpenStreetMap / CartoDB tile calculations. Do not request a tile until we have a real fix.
   const tileUrl = useMemo(() => {
+    if (projectedPoints.length === 0) return null;
     const n = Math.pow(2, 13);
     const x = Math.floor(((centerLon + 180) / 360) * n);
     const latRad = (centerLat * Math.PI) / 180;
@@ -150,13 +149,23 @@ export default function InbuiltRouteMap({
     }
     // Clean Voyager light map (matching Strava style)
     return `https://a.basemaps.cartocdn.com/rastertiles/voyager/13/${x}/${y}.png`;
-  }, [centerLat, centerLon, mapTheme]);
+  }, [centerLat, centerLon, mapTheme, projectedPoints.length]);
+
+  if (projectedPoints.length === 0) {
+    return (
+      <View style={[styles.mapContainer, styles.waitingForGps, { height: mapHeight }]}>
+        <Compass size={26} color={Colors.primary} />
+        <Text style={styles.waitingTitle}>Waiting for GPS</Text>
+        <Text style={styles.waitingSubtitle}>A real map position will appear when your device provides a location fix.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.mapContainer, { height: mapHeight }]}>
       {/* Background Map Tile Layer */}
       <Image
-        source={{ uri: tileUrl }}
+        source={{ uri: tileUrl || undefined }}
         style={StyleSheet.absoluteFillObject}
         resizeMode="cover"
       />
@@ -267,7 +276,7 @@ export default function InbuiltRouteMap({
         <View style={styles.gpsBadge}>
           <View style={[styles.gpsDot, isLiveTracking && styles.gpsDotLive]} />
           <Text style={styles.gpsText}>
-            {isLiveTracking ? 'GPS Recording Active' : 'Verified GPS Trail (±3m)'}
+            {isLiveTracking ? 'GPS RECORDING' : currentLocation ? 'CURRENT GPS POSITION' : 'SAVED GPS ROUTE'}
           </Text>
         </View>
 
@@ -385,6 +394,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F0E6',
     borderWidth: 1,
     borderColor: '#E6E1D5',
+  },
+  waitingForGps: {
+    backgroundColor: '#F1F5F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  waitingTitle: {
+    marginTop: 10,
+    color: Colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  waitingSubtitle: {
+    marginTop: 5,
+    color: Colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   tileBackdrop: {
     ...StyleSheet.absoluteFillObject,

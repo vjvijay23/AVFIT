@@ -88,6 +88,8 @@ export const LiveWalkingHUD: React.FC<LiveWalkingHUDProps> = ({
               ? 'PAUSED'
               : status === 'starting'
               ? 'INITIALIZING'
+              : status === 'error'
+              ? 'GPS NEEDS ATTENTION'
               : 'READY TO WALK'}
           </Text>
         </View>
@@ -123,14 +125,14 @@ export const LiveWalkingHUD: React.FC<LiveWalkingHUDProps> = ({
 
       {/* Control Buttons */}
       <View style={styles.controlsRow}>
-        {status === 'idle' || status === 'finished' ? (
+        {status === 'idle' || status === 'finished' || status === 'error' ? (
           <TouchableOpacity
             style={[styles.actionButton, styles.startButton]}
             onPress={onStart}
             activeOpacity={0.88}
           >
             <Play size={22} color="#FFFFFF" fill="#FFFFFF" />
-            <Text style={styles.startButtonText}>START WALK</Text>
+            <Text style={styles.startButtonText}>{status === 'error' ? 'RETRY GPS' : 'START WALK'}</Text>
           </TouchableOpacity>
         ) : status === 'starting' ? (
           <View style={[styles.actionButton, styles.startingButton]}>

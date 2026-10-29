@@ -154,6 +154,15 @@ async function msg91VerifyAccessToken(accessToken: string): Promise<string> {
     const result = await response.json().catch(() => ({})) as { type?: string; message?: string; code?: string | number };
     // MSG91 can return HTTP 200 with an error payload, so check the body too.
     if (!response.ok || result.type !== 'success' || typeof result.message !== 'string') {
+      // MSG91 Authkeys can restrict requests by source IP. Render's outbound
+      // address must be allowed by the Authkey when this security option is on.
+      // Do this before the generic type:error mapping so an infrastructure
+      // restriction is never presented to the user as a mistyped OTP.
+      if (String(result.code) === '418') {
+        const error = new Error('MSG91 blocked verification because the Render server IP is not allowed for this Authkey. Check the Authkey IP security settings and allow Render’s outbound IP.');
+        Object.assign(error, { providerDiagnosticCode: '418' });
+        throw error;
+      }
       if (response.status === 401 || String(result.code) === '201') {
         throw new Error('MSG91 authentication failed. Check the account Authkey and its IP allowlist in the backend environment.');
       }
