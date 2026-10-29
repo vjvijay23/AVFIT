@@ -97,7 +97,8 @@ export default function FoodScannerScreen({ navigation }: any) {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        // Smaller JPEGs upload faster on mobile data while retaining enough detail for meal estimates.
+        quality: 0.55,
         base64: true,
       });
 
@@ -121,7 +122,7 @@ export default function FoodScannerScreen({ navigation }: any) {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.55,
         base64: true,
       });
 

@@ -80,7 +80,8 @@ export default function RecordActivityScreen({ route, navigation }: any) {
   } = useLocationTracker();
 
   // Calories burned calculation (~62 kcal per km for running)
-  const caloriesBurned = Math.round(totalDistanceKm * 62) || Math.round(activeDurationSec * 0.16);
+  // Do not estimate calories from elapsed time alone when the GPS route has no movement.
+  const caloriesBurned = Math.round(totalDistanceKm * 62);
 
   // Start activity
   const handleStart = () => {

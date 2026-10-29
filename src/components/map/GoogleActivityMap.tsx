@@ -39,10 +39,10 @@ export default function GoogleActivityMap({
   const initialRegion: Region = {
     latitude:
       currentLocation?.latitude ||
-      (routeCoordinates.length > 0 ? routeCoordinates[0].latitude : 37.7749),
+      (routeCoordinates.length > 0 ? routeCoordinates[0].latitude : 0),
     longitude:
       currentLocation?.longitude ||
-      (routeCoordinates.length > 0 ? routeCoordinates[0].longitude : -122.4194),
+      (routeCoordinates.length > 0 ? routeCoordinates[0].longitude : 0),
     latitudeDelta: 0.006,
     longitudeDelta: 0.006,
   };
@@ -74,6 +74,17 @@ export default function GoogleActivityMap({
       );
     }
   }, [routeCoordinates, isTracking]);
+
+  // Avoid showing a fabricated default region (San Francisco) while the device has no GPS fix.
+  if (!currentLocation && routeCoordinates.length === 0) {
+    return (
+      <View style={[styles.container, { height: height as any }, styles.waitingForGps]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Waiting for your GPS location…</Text>
+        <Text style={styles.loadingSub}>The map and route will appear when the device reports a real location.</Text>
+      </View>
+    );
+  }
 
   // Handle manual recenter button click
   const handleRecenter = useCallback(() => {
@@ -207,6 +218,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+    padding: 24,
+  },
+  waitingForGps: {
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 24,
   },
   loadingText: {

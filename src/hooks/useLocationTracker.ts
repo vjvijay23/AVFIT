@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as Location from 'expo-location';
-import { Platform } from 'react-native';
 import { GPSPoint } from '../types';
 
 export type TrackingStatus =
@@ -89,6 +88,9 @@ export function useLocationTracker() {
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const timerInterval = useRef<any>(null);
   const lastAcceptedPoint = useRef<GPSPoint | null>(null);
+  const totalDistanceRef = useRef(0);
+  const activeDurationRef = useRef(0);
+  const lastGpsSampleAtRef = useRef(0);
   const isTrackingActive = useRef<boolean>(false);
   const isPausedRef = useRef<boolean>(false);
 
@@ -99,15 +101,17 @@ export function useLocationTracker() {
 
     try {
       // Fast permission check
-      let permStatus = 'granted';
-      let canAskAgain = true;
+      let permStatus: string;
+      let canAskAgain = false;
       try {
         const permResult = await Location.requestForegroundPermissionsAsync();
         permStatus = permResult.status;
         canAskAgain = permResult.canAskAgain;
       } catch (pErr) {
         console.warn('Permission request error:', pErr);
-        permStatus = 'granted';
+        setErrorMessage('Could not request location permission. Please check your device settings and try again.');
+        setStatus('error');
+        return false;
       }
 
       if (permStatus !== 'granted') {
@@ -142,7 +146,7 @@ export function useLocationTracker() {
           initialLocation = await Promise.race([locationPromise, timeoutPromise]);
         }
       } catch (locErr) {
-        console.warn('Initial location fetch timeout/error, using fallback:', locErr);
+        console.warn('Initial location fetch timeout/error:', locErr);
       }
 
       if (initialLocation?.coords) {
@@ -158,37 +162,21 @@ export function useLocationTracker() {
         setGpsAccuracy(pt.accuracy ? Math.round(pt.accuracy) : null);
         setLastUpdateTime(new Date().toLocaleTimeString());
       } else {
-        const fallbackPt: GPSPoint = {
-          latitude: 37.7749,
-          longitude: -122.4194,
-          altitude: 10,
-          speed: 0,
-          accuracy: 5,
-          timestamp: Date.now(),
-        };
-        setCurrentLocation(fallbackPt);
-        setGpsAccuracy(5);
-        setLastUpdateTime(new Date().toLocaleTimeString());
+        setCurrentLocation(null);
+        setGpsAccuracy(null);
+        setLastUpdateTime(null);
       }
 
       setStatus('ready');
       return true;
     } catch (err: any) {
-      console.warn('GPS initialization fallback:', err);
-      const fallbackPt: GPSPoint = {
-        latitude: 37.7749,
-        longitude: -122.4194,
-        accuracy: 5,
-        altitude: 10,
-        speed: 0,
-        timestamp: Date.now(),
-      };
-      setCurrentLocation(fallbackPt);
-      setGpsAccuracy(5);
-      setLastUpdateTime(new Date().toLocaleTimeString());
-      setPermissionState('granted');
-      setStatus('ready');
-      return true;
+      console.warn('GPS initialization failed:', err);
+      setCurrentLocation(null);
+      setGpsAccuracy(null);
+      setLastUpdateTime(null);
+      setErrorMessage('Could not initialize GPS. Check that location is enabled and try again.');
+      setStatus('error');
+      return false;
     }
   }, []);
 
@@ -212,6 +200,7 @@ export function useLocationTracker() {
   // 2. Location processing callback with rigorous filtering
   const processLocationUpdate = useCallback((newLoc: Location.LocationObject) => {
     if (!isTrackingActive.current || isPausedRef.current) return;
+    lastGpsSampleAtRef.current = Date.now();
 
     const { latitude, longitude, altitude, speed, accuracy } = newLoc.coords;
     const timestamp = newLoc.timestamp || Date.now();
@@ -225,7 +214,12 @@ export function useLocationTracker() {
       timestamp,
     };
 
-    setCurrentLocation(currentPoint);
+    if (accuracy && accuracy > 25) {
+      setGpsAccuracy(Math.round(accuracy));
+      setLastUpdateTime(new Date(timestamp).toLocaleTimeString());
+      return;
+    }
+
     if (accuracy) setGpsAccuracy(Math.round(accuracy));
     setLastUpdateTime(new Date().toLocaleTimeString());
 
@@ -233,10 +227,6 @@ export function useLocationTracker() {
     // FILTERING: Reject invalid readings
     // -----------------------------------------------------------------
     // A. Reject excessively inaccurate readings (> 25 meters accuracy)
-    if (accuracy && accuracy > 25) {
-      return;
-    }
-
     if (lastAcceptedPoint.current) {
       const prev = lastAcceptedPoint.current;
       const distMeters = haversineDistanceMeters(prev.latitude, prev.longitude, latitude, longitude);
@@ -255,10 +245,11 @@ export function useLocationTracker() {
 
       // Accepted point! Accrue distance
       const distKm = distMeters / 1000;
-      setTotalDistanceKm((prevDist) => {
-        const nextDist = prevDist + distKm;
-        return parseFloat(nextDist.toFixed(3));
-      });
+      totalDistanceRef.current += distKm;
+      setTotalDistanceKm(parseFloat(totalDistanceRef.current.toFixed(3)));
+      if (totalDistanceRef.current > 0.01 && activeDurationRef.current > 0) {
+        setAvgPace(formatPace(activeDurationRef.current / totalDistanceRef.current));
+      }
 
       // Update Live Pace
       if (distKm > 0 && timeDeltaSec > 0) {
@@ -266,6 +257,9 @@ export function useLocationTracker() {
         setLivePace(formatPace(currentPaceSec));
       }
     }
+
+    // Only move the map marker and route after the point passes the GPS filters.
+    setCurrentLocation(currentPoint);
 
     // Append to live route coordinates
     lastAcceptedPoint.current = currentPoint;
@@ -277,26 +271,21 @@ export function useLocationTracker() {
     // Prevent multiple simultaneous tracking sessions
     if (isTrackingActive.current) return;
 
-    isTrackingActive.current = true;
-    isPausedRef.current = false;
-    setStatus('recording');
     setErrorMessage(null);
-
-    // Initial seed coordinate if empty
-    const seedPoint = currentLocation || {
-      latitude: 37.7749,
-      longitude: -122.4194,
-      accuracy: 3,
-      altitude: 10,
-      speed: 0,
-      timestamp: Date.now(),
-    };
-
-    if (routeCoordinates.length === 0) {
-      setRouteCoordinates([seedPoint]);
-      lastAcceptedPoint.current = seedPoint;
-      setCurrentLocation(seedPoint);
+    let permission = await Location.getForegroundPermissionsAsync();
+    if (permission.status !== 'granted') {
+      const granted = await requestPermissions();
+      if (!granted) return;
+      permission = await Location.getForegroundPermissionsAsync();
     }
+    if (permission.status !== 'granted') {
+      setErrorMessage('Location permission is required to record a real route.');
+      setStatus('error');
+      return;
+    }
+
+    isPausedRef.current = false;
+    lastGpsSampleAtRef.current = Date.now();
 
     // Start High-Accuracy Hardware GPS Watch
     try {
@@ -308,74 +297,47 @@ export function useLocationTracker() {
       locationSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 1000,
-          distanceInterval: 1, // update every 1 meter
+          timeInterval: 2000,
+          distanceInterval: 2,
         },
         processLocationUpdate
       );
+      isTrackingActive.current = true;
+      setStatus('recording');
     } catch (err: any) {
       console.warn('Location watch error:', err);
+      isTrackingActive.current = false;
+      setStatus('error');
+      setErrorMessage('Could not start GPS tracking. Check location permissions and device settings, then try again.');
+      return;
     }
 
     // Start Duration & Average Pace Timer
     if (timerInterval.current) clearInterval(timerInterval.current);
     timerInterval.current = setInterval(() => {
       if (isTrackingActive.current && !isPausedRef.current) {
-        setActiveDurationSec((prevSec) => {
-          const nextSec = prevSec + 1;
-
-          // For responsive tracking & emulator support: simulate small steps if stationary
-          if (nextSec % 2 === 0) {
-            setRouteCoordinates((coords) => {
-              const last = coords[coords.length - 1] || lastAcceptedPoint.current || {
-                latitude: 37.7749,
-                longitude: -122.4194,
-                timestamp: Date.now(),
-              };
-
-              const latDelta = Math.sin(nextSec / 6) * 0.00003 + 0.00004;
-              const lonDelta = Math.cos(nextSec / 6) * 0.00003 + 0.00004;
-
-              const nextPt: GPSPoint = {
-                latitude: parseFloat((last.latitude + latDelta).toFixed(6)),
-                longitude: parseFloat((last.longitude + lonDelta).toFixed(6)),
-                altitude: 12 + Math.sin(nextSec / 4) * 2,
-                accuracy: 3,
-                speed: 2.8,
-                timestamp: Date.now(),
-              };
-
-              const distDelta = haversineDistanceMeters(
-                last.latitude,
-                last.longitude,
-                nextPt.latitude,
-                nextPt.longitude
-              );
-
-              setTotalDistanceKm((currDist) => {
-                const nextDist = parseFloat((currDist + distDelta / 1000).toFixed(3));
-                if (nextDist > 0.01) {
-                  const secPerKm = nextSec / nextDist;
-                  setAvgPace(formatPace(secPerKm));
-                  setLivePace(formatPace(secPerKm));
-                }
-                return nextDist;
-              });
-
-              setCurrentLocation(nextPt);
-              setGpsAccuracy(3);
-              setLastUpdateTime(new Date().toLocaleTimeString());
-              lastAcceptedPoint.current = nextPt;
-
-              return [...coords, nextPt];
-            });
+        if (Date.now() - lastGpsSampleAtRef.current > 30000) {
+          isTrackingActive.current = false;
+          locationSubscription.current?.remove();
+          locationSubscription.current = null;
+          if (timerInterval.current) {
+            clearInterval(timerInterval.current);
+            timerInterval.current = null;
           }
-
-          return nextSec;
+          setStatus('error');
+          setErrorMessage('GPS has not provided a location update for 30 seconds. Check device location and restart the activity.');
+          return;
+        }
+        setActiveDurationSec((prevSec) => {
+          return prevSec + 1;
         });
+        activeDurationRef.current += 1;
+        if (totalDistanceRef.current > 0.01) {
+          setAvgPace(formatPace(activeDurationRef.current / totalDistanceRef.current));
+        }
       }
     }, 1000);
-  }, [permissionState, requestPermissions, routeCoordinates.length, currentLocation, processLocationUpdate]);
+  }, [requestPermissions, processLocationUpdate]);
 
   // 4. Pause Activity Tracking
   const pauseTracking = useCallback(() => {
@@ -388,6 +350,7 @@ export function useLocationTracker() {
   const resumeTracking = useCallback(() => {
     if (!isTrackingActive.current) return;
     isPausedRef.current = false;
+    lastGpsSampleAtRef.current = Date.now();
     setStatus('recording');
   }, []);
 
@@ -416,6 +379,8 @@ export function useLocationTracker() {
     setRouteCoordinates([]);
     setTotalDistanceKm(0);
     setActiveDurationSec(0);
+    totalDistanceRef.current = 0;
+    activeDurationRef.current = 0;
     setLivePace('--:-- /km');
     setAvgPace('--:-- /km');
     lastAcceptedPoint.current = null;
