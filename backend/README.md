@@ -1,9 +1,10 @@
 # AVFIT Full-Stack Backend Service
 ### Live Walking GPS Analyzer (Strava-style) & Multimodal Food Vision (Gemini AI)
 
-## Mock API tests
+## API tests
 
-Run the API tests without connecting to PostgreSQL or Redis:
+The isolated API checks use in-memory database/provider stubs and do not write
+to a real database. Run them with:
 
 ```powershell
 npm run test:mock
@@ -67,13 +68,13 @@ Diet-plan context is intentionally modular: add a `DietPlanContextProvider` in `
 ### 🔑 4. Phone OTP Authentication (`/api/v1/auth`)
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/v1/auth/otp/send` | By default, ask Twilio Verify to send an SMS code. In explicitly enabled local mock mode, return a temporary development code and send no SMS. |
-| `POST` | `/api/v1/auth/otp/verify` | Validate with Twilio (default) or the temporary local mock challenge, then return a 7-day JWT + profile. |
+| `POST` | `/api/v1/auth/otp/verify` | Validate the access token returned by the MSG91 OTP widget, match its verified phone to the requested phone, then return a 7-day JWT + PostgreSQL profile. |
+| `GET` | `/api/v1/auth/otp/user-exists?identifier=<phone>` | Privacy-preserving MSG91 widget user-existence callback. |
 | `GET` | `/api/v1/auth/profile/:id` | Get user profile and active streaks. |
 
 ## Expanded API
 
-All routes below that change or expose personal data require `Authorization: Bearer <token>`. By default, obtain a token by requesting an SMS code and submitting the code actually received. OTP send and verification fail closed unless Twilio Verify is configured. Local development can opt into an ephemeral mock OTP as described below. Never commit provider credentials or use development JWT secrets in production.
+All routes below that change or expose personal data require `Authorization: Bearer <token>`. The app sends and checks the SMS through the MSG91 client widget; the backend validates MSG91's returned access token against MSG91 and only then reads or writes the real PostgreSQL profile. There is no OTP mock or alternate provider. Never commit provider credentials or use development JWT secrets in production.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
@@ -98,67 +99,32 @@ All routes below that change or expose personal data require `Authorization: Bea
 
 ## Local setup
 
-1. Create a Twilio Verify service in your Twilio Console. In `backend`, copy `.env.example` to `.env`, set `TWILIO_VERIFY_SERVICE_SID`, and preferably set `TWILIO_API_KEY_SID` plus `TWILIO_API_KEY_SECRET` from a Standard API key created in the same Twilio account and region. Alternatively set `TWILIO_ACCOUNT_SID` plus `TWILIO_AUTH_TOKEN`. Phone numbers must include the country code in E.164 form, for example `+919876543210`. Twilio trial accounts may restrict delivery to verified recipient numbers.
-2. Set `GEMINI_API_KEY` in the backend environment for live food photo analysis and diet plan generation. `GEMINI_MODEL` defaults to `gemini-3.8-flash`. Never put the key in an `EXPO_PUBLIC_*` variable or mobile app.
+1. In `backend`, copy `.env.example` to `.env` and set `MSG91_AUTHKEY` to the Authkey for the same MSG91 account that owns the client widget. The mobile build needs `EXPO_PUBLIC_MSG91_MOBILE_WIDGET_ID` and `EXPO_PUBLIC_MSG91_MOBILE_TOKEN_AUTH`; the web build needs `EXPO_PUBLIC_MSG91_WEB_WIDGET_ID` and `EXPO_PUBLIC_MSG91_WEB_TOKEN_AUTH` (the shared widget variables are also accepted). The widget must allow the matching client platform and use a six-digit code.
+2. Set `GEMINI_API_KEY` in the backend environment for food photo analysis and diet-plan generation. Never put it in an `EXPO_PUBLIC_*` variable or mobile app.
 3. Run `npm ci`.
 4. Run `docker compose up -d` to start PostgreSQL/PostGIS and Redis.
-5. Run `npm run dev`. Startup applies the idempotent schema and seeds a small workout catalog.
-6. Open `http://localhost:5000/documentation`; check `http://localhost:5000/health` for dependency status.
+5. Run `npm run dev`. Startup applies the schema. It does not create demo user records.
+6. Open `http://localhost:5000/documentation`; check `http://localhost:5000/health` for PostgreSQL and Redis status.
 
-### Local OTP testing without paid Twilio SMS
+### Test against the configured MSG91 and database
 
-Set `OTP_PROVIDER=mock` in `backend/.env` and keep `NODE_ENV=development`, then restart the backend. Signup/login will show a randomly generated 6-digit development code in the app; no SMS is sent. The code expires after five minutes, allows at most five attempts, and is held only in backend memory. Request a new code after a backend restart. `OTP_PROVIDER` defaults to `twilio`, and the backend refuses to start in production if mock mode is selected. Remove `OTP_PROVIDER=mock` (or set it to `twilio`) to return to real Twilio Verify.
+Use a real phone number you control. In the app, sign up or log in; MSG91 sends the OTP directly to that number. Enter the received code in the app. The backend checks the widget's access token with MSG91 and then looks up the profile using the normalized phone number. It creates a profile only for a signup with valid name, birth date, and gender; login never creates a missing account. No test profile is seeded. A real OTP request sends an SMS and may consume MSG91 account quota.
 
-## PowerShell smoke test
-
-Run these from a second PowerShell window after the server is up. Use a fresh phone number if you want a fresh account. Keep the same window open so `$token`, `$userId`, and IDs remain defined.
+Check the backend and database connection without changing rows:
 
 ```powershell
-$base = 'http://localhost:5000/api/v1'
-$phone = '+15551234567'
-Invoke-RestMethod -Method Post -Uri "$base/auth/otp/send" -ContentType 'application/json' -Body (@{phone=$phone} | ConvertTo-Json)
-$otp = Read-Host 'Enter the code received by SMS'
-$login = Invoke-RestMethod -Method Post -Uri "$base/auth/otp/verify" -ContentType 'application/json' -Body (@{phone=$phone;otp=$otp;fullName='Test Athlete'} | ConvertTo-Json)
-$token = $login.token
-$userId = $login.user.id
-$headers = @{Authorization="Bearer $token"}
+$health = Invoke-RestMethod 'http://localhost:5000/health'
+$health | Select-Object status, postgres, redis, otpProvider
 ```
 
-Then exercise each subsystem:
+To inspect the actual account after signing in, use the PostgreSQL console without inserting test rows:
 
-```powershell
-# Profile and onboarding targets
-Invoke-RestMethod -Method Patch -Uri "$base/auth/profile" -Headers $headers -ContentType 'application/json' -Body (@{gender='male';dateOfBirth='1995-01-01';country='US'} | ConvertTo-Json)
-$fitness = Invoke-RestMethod -Method Put -Uri "$base/fitness/profile" -Headers $headers -ContentType 'application/json' -Body (@{heightCm=178;weightKg=75;fitnessGoal='general_fitness';activityLevel='moderately_active';dietaryPreference='non_vegetarian'} | ConvertTo-Json)
-Invoke-RestMethod -Uri "$base/fitness/dashboard" -Headers $headers
-
-# Meals, workouts, and achievements
-$meal = Invoke-RestMethod -Method Post -Uri "$base/meals" -Headers $headers -ContentType 'application/json' -Body (@{dishName='Test oats';calories=350;proteinG=18;carbsG=55;fatG=8;mealType='breakfast'} | ConvertTo-Json)
-Invoke-RestMethod -Uri "$base/meals" -Headers $headers
-$catalog = Invoke-RestMethod -Uri "$base/workouts"
-$workoutId = $catalog.workouts[0].id
-Invoke-RestMethod -Method Post -Uri "$base/workouts/complete" -Headers $headers -ContentType 'application/json' -Body (@{workoutId=$workoutId;durationSeconds=900} | ConvertTo-Json)
-Invoke-RestMethod -Uri "$base/workouts/logs" -Headers $headers
-Invoke-RestMethod -Uri "$base/achievements/me" -Headers $headers
-
-# Steps and leaderboard
-Invoke-RestMethod -Method Post -Uri "$base/leaderboard/steps" -Headers $headers -ContentType 'application/json' -Body (@{userId=$userId;steps=6500} | ConvertTo-Json)
-Invoke-RestMethod -Uri "$base/leaderboard/steps" -Headers $headers
-
-# Activity (routeCoordinates use longitude/latitude points)
-$activity = @{userId=$userId;sportType='walking';title='Test walk';durationSec=900;distanceKm=1.2;calories=65;avgPace='12:30';routeCoordinates=@(@{latitude=37.7749;longitude=-122.4194;timestamp=1790000000000},@{latitude=37.7759;longitude=-122.4184;timestamp=1790000060000})} | ConvertTo-Json -Depth 5
-Invoke-RestMethod -Method Post -Uri "$base/activities/record" -Headers $headers -ContentType 'application/json' -Body $activity
-Invoke-RestMethod -Uri "$base/activities/user/$userId" -Headers $headers
-
-# Feed and challenge
-$post = Invoke-RestMethod -Method Post -Uri "$base/community/posts" -Headers $headers -ContentType 'application/json' -Body (@{content='Testing the AVFIT backend';postType='general'} | ConvertTo-Json)
-Invoke-RestMethod -Method Post -Uri "$base/community/posts/$($post.post.id)/likes" -Headers $headers
-Invoke-RestMethod -Method Post -Uri "$base/community/posts/$($post.post.id)/comments" -Headers $headers -ContentType 'application/json' -Body (@{content='Nice test'} | ConvertTo-Json)
-$today = (Get-Date).ToString('yyyy-MM-dd')
-$tomorrow = (Get-Date).AddDays(1).ToString('yyyy-MM-dd')
-$challenge = Invoke-RestMethod -Method Post -Uri "$base/community/challenges" -Headers $headers -ContentType 'application/json' -Body (@{title='Smoke test';description='Local API check';targetMetric='steps';targetValue=1000;startDate=$today;endDate=$tomorrow} | ConvertTo-Json)
-Invoke-RestMethod -Method Post -Uri "$base/community/challenges/$($challenge.challenge.id)/join" -Headers $headers
-Invoke-RestMethod -Uri "$base/community/challenges/$($challenge.challenge.id)/leaderboard" -Headers $headers
+```sql
+SELECT id, phone, full_name, date_of_birth, gender, created_at, updated_at
+FROM profiles
+ORDER BY created_at DESC;
 ```
 
-To verify access control, repeat a protected call without `$headers`; it should return `401`. To verify ownership, create a second account and try to read the first account's `/auth/profile/:id` or `/activities/user/:userId`; it should return `403`. `POST /vision/scan-food` accepts `{imageBase64,mimeType}`. Without `GEMINI_API_KEY`, AI endpoints return `503` and do not create fake results.
+For Render, use the deployed `/health` URL and the Render PostgreSQL console. Never paste a production database URL or provider secret into source control or a client build.
+
+To verify the existing user's record without modifying it, inspect the matching phone in PostgreSQL and confirm that the profile shown after login has the same name, DOB, gender, and onboarding state. For other data routes, use the signed-in app to read the account's existing history first; do not replay write requests against production as test fixtures. `POST /vision/scan-food` accepts `{imageBase64,mimeType}`. Without `GEMINI_API_KEY`, AI endpoints return `503` and do not create fake results.

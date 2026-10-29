@@ -1,3 +1,5 @@
+import { getMsg91AccessToken } from './msg91AccessToken';
+
 type WidgetResult = { type?: string; message?: string; 'access-token'?: string; code?: string | number };
 type WidgetCallback = (result: WidgetResult) => void;
 
@@ -181,10 +183,7 @@ export async function verifyOtp(phone: string, otp: string): Promise<string> {
     if (!widget.verifyOtp) throw new Error('MSG91 did not initialize its web verify method. Request a new code and try again.');
     result = await withCallbackTimeout(new Promise<WidgetResult>((resolve, reject) => widget.verifyOtp!(otp, resolve, reject, reqId)));
   }
-  const accessToken = result?.['access-token'] || result?.message;
-  if (result?.type !== 'success' || typeof accessToken !== 'string' || accessToken.length < 20) {
-    throw new Error('Invalid or expired verification code. Check the code and try again.');
-  }
+  const accessToken = getMsg91AccessToken(result);
   requestIds.delete(identifier);
   requestTransports.delete(identifier);
   return accessToken;

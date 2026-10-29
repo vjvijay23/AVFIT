@@ -20,7 +20,6 @@ import {
   ShieldCheck,
   ChevronLeft,
   AlertCircle,
-  Zap,
   Lock,
 } from 'lucide-react-native';
 
@@ -72,7 +71,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           phone: fullPhone,
           countryCode: selectedCountry.code,
           authMode: 'login',
-          ...(response.developmentOtp ? { developmentOtp: response.developmentOtp } : {}),
         });
       }
     } catch (err: any) {
@@ -80,11 +78,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Instant demo helper to log in directly without typing
-  const handleQuickDemoLogin = async () => {
-    navigation.navigate('Main');
   };
 
   return (
@@ -196,16 +189,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 <ArrowRight size={18} color="#FFFFFF" />
               </>
             )}
-          </TouchableOpacity>
-
-          {/* Quick Demo Login Option */}
-          <TouchableOpacity
-            style={styles.quickDemoButton}
-            onPress={handleQuickDemoLogin}
-            activeOpacity={0.8}
-          >
-            <Zap size={15} color={Colors.accentOrange} />
-            <Text style={styles.quickDemoText}>Quick Test: Enter as Alex Vance (Demo)</Text>
           </TouchableOpacity>
 
           {/* Link to Sign Up */}
@@ -401,23 +384,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#FFFFFF',
-  },
-  quickDemoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: Colors.surfaceWarm,
-    paddingVertical: 13,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 18,
-  },
-  quickDemoText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: Colors.textPrimary,
   },
   signupLinkRow: {
     flexDirection: 'row',

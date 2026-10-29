@@ -11,23 +11,12 @@ export const config = {
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   geminiModel: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
   jwtSecret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-only-change-me'),
-  twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',
-  twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
-  twilioApiKeySid: process.env.TWILIO_API_KEY_SID || '',
-  twilioApiKeySecret: process.env.TWILIO_API_KEY_SECRET || '',
-  twilioVerifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID || '',
   msg91AuthKey: process.env.MSG91_AUTHKEY || '',
-  otpProvider: process.env.OTP_PROVIDER || 'twilio',
 };
-
-if (!['twilio', 'msg91', 'mock'].includes(config.otpProvider)) {
-  throw new Error('OTP_PROVIDER must be either "twilio", "msg91", or "mock".');
-}
-
-if (config.nodeEnv === 'production' && config.otpProvider === 'mock') {
-  throw new Error('OTP_PROVIDER=mock is only allowed outside production.');
-}
 
 if (config.nodeEnv === 'production' && config.jwtSecret.length < 32) {
   throw new Error('JWT_SECRET must be configured with at least 32 characters in production.');
+}
+if (config.nodeEnv === 'production' && !config.msg91AuthKey) {
+  throw new Error('MSG91_AUTHKEY must be configured in production.');
 }

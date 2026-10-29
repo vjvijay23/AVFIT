@@ -1,3 +1,5 @@
+import { getMsg91AccessToken } from './msg91AccessToken';
+
 declare const require: (moduleName: string) => unknown;
 const { OTPWidget } = require('@msg91comm/sendotp-react-native') as {
   OTPWidget: {
@@ -63,10 +65,7 @@ export async function verifyOtp(phone: string, otp: string): Promise<string> {
   if (!reqId) throw new Error('This verification request expired. Request a new code and try again.');
 
   const result = await withOperationTimeout(OTPWidget.verifyOTP({ reqId, otp })) as { type?: string; message?: string; 'access-token'?: string };
-  const accessToken = result?.['access-token'] || result?.message;
-  if (result?.type !== 'success' || typeof accessToken !== 'string' || accessToken.length < 20) {
-    throw new Error('Invalid or expired verification code. Check the code and try again.');
-  }
+  const accessToken = getMsg91AccessToken(result);
   requestIds.delete(identifier);
   return accessToken;
 }

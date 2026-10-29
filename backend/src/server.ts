@@ -78,7 +78,7 @@ export async function buildApp() {
       timestamp: new Date().toISOString(),
       postgres,
       redis: redisStatus,
-      otpProvider: config.otpProvider,
+      otpProvider: 'msg91',
     };
   });
 
@@ -105,7 +105,7 @@ export async function start() {
     const app = await buildApp();
     await app.listen({ port: config.port, host: config.host });
     console.log(`\n🚀 AVFIT Fastify Backend running on http://${config.host}:${config.port}`);
-    console.log(`🔐 OTP provider: ${config.otpProvider}`);
+    console.log('🔐 OTP provider: MSG91');
     console.log(`📚 Interactive API Docs (Swagger): http://localhost:${config.port}/documentation\n`);
     return app;
   } catch (err) {
