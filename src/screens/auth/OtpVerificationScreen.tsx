@@ -31,7 +31,6 @@ interface OtpVerificationScreenProps {
       countryCode?: string;
       authMode?: 'login' | 'signup';
       pendingProfile?: any;
-      developmentOtp?: string;
     };
   };
   navigation?: any;
@@ -50,18 +49,13 @@ export default function OtpVerificationScreen({
   const countryCode = route?.params?.countryCode || '+1';
   const authMode = route?.params?.authMode || 'signup';
   const pendingProfile = route?.params?.pendingProfile;
-  const [developmentOtp, setDevelopmentOtp] = useState(route?.params?.developmentOtp);
 
   const [otpDigits, setOtpDigits] = useState(() => Array.from({ length: OTP_CODE_LENGTH }, () => ''));
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successNotice, setSuccessNotice] = useState<string | null>(
-    route?.params?.developmentOtp
-      ? `Development mock OTP: ${route.params.developmentOtp}. No SMS was sent.`
-      : `Enter the ${OTP_CODE_LENGTH}-digit verification code sent to your phone.`
-  );
+  const [successNotice, setSuccessNotice] = useState<string | null>(`Enter the ${OTP_CODE_LENGTH}-digit verification code sent to your phone.`);
 
   const inputRefs = useRef<Array<TextInput | null>>([]);
 
@@ -149,16 +143,12 @@ export default function OtpVerificationScreen({
 
     setIsLoading(true);
     setErrorMessage(null);
-    setSuccessNotice(null);
 
     try {
       const response = await AuthService.resendPhoneOtp({ phone, countryCode });
-      setDevelopmentOtp(response.developmentOtp);
       setCountdown(60);
       setCanResend(false);
-      setSuccessNotice(response.developmentOtp
-        ? `Development mock OTP: ${response.developmentOtp}. No SMS was sent.`
-        : response.message || 'A new verification code was sent to your phone.');
+      setSuccessNotice(response.message || 'A new verification code was sent to your phone.');
       setOtpDigits(Array.from({ length: OTP_CODE_LENGTH }, () => ''));
       inputRefs.current[0]?.focus();
     } catch (err: any) {
@@ -193,7 +183,7 @@ export default function OtpVerificationScreen({
 
           <Text style={styles.title}>Enter {OTP_CODE_LENGTH}-Digit OTP</Text>
           <Text style={styles.subtitle}>
-            {developmentOtp ? 'Use the development code shown below:' : "We've sent a one-time verification code to:"}
+            We've sent a one-time verification code to:
           </Text>
 
           {/* Phone Display with Edit */}

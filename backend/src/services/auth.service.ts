@@ -1,11 +1,5 @@
 import { pool } from '../db/index.js';
 import { config } from '../config/index.js';
-import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
-
-const MOCK_OTP_TTL_MS = 5 * 60 * 1000;
-const MOCK_OTP_RESEND_DELAY_MS = 60 * 1000;
-const MOCK_OTP_MAX_ATTEMPTS = 5;
-const mockOtpChallenges = new Map<string, { codeHash: Buffer; expiresAt: number; resendAfter: number; attempts: number }>();
 
 export interface UserProfileData {
   id: string;
@@ -23,91 +17,22 @@ export interface UserProfileData {
 
 export class AuthService {
   /**
-   * Start SMS verification through Twilio, or an explicitly enabled local
-   * development mock. MSG91 verification starts in its client SDK so its
-   * widget-scoped token stays in the app; the backend validates its access token.
-   * Mock codes expire after five minutes and are exposed only outside production.
-   */
-  static async requestOtp(phone: string) {
-    const cleanPhone = normalizePhone(phone);
-    if (config.otpProvider === 'mock') {
-      const existing = mockOtpChallenges.get(cleanPhone);
-      if (existing && existing.resendAfter > Date.now()) {
-        throw new Error('Please wait before requesting another development code.');
-      }
-      const code = String(randomInt(100000, 1000000));
-      mockOtpChallenges.set(cleanPhone, {
-        codeHash: hashMockOtp(code),
-        expiresAt: Date.now() + MOCK_OTP_TTL_MS,
-        resendAfter: Date.now() + MOCK_OTP_RESEND_DELAY_MS,
-        attempts: 0,
-      });
-      return {
-        success: true,
-        message: 'Development mock mode is enabled. No SMS was sent.',
-        phone: cleanPhone,
-        isMockOtp: true,
-        developmentOtp: code,
-      };
-    }
-
-    if (config.otpProvider === 'msg91') {
-      throw new Error('MSG91 OTP is sent by the mobile widget. Request a verification code from the AVFIT mobile app.');
-    }
-
-    const result = await twilioVerify('Verifications', { To: cleanPhone, Channel: 'sms' });
-    if (result.status !== 'pending') throw new Error('The SMS verification could not be started. Please try again.');
-    return {
-      success: true,
-      message: 'Verification code sent by SMS.',
-      phone: cleanPhone,
-      isMockOtp: false,
-    };
-  }
-
-  /**
-   * Verify OTP and return or create user profile
+   * Verify the MSG91 widget access token, then return or create user profile.
    */
   static async verifyOtp(
     phone: string,
-    otp: string,
     profile: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string } = {},
     authMode: 'login' | 'signup' = 'signup',
-    providerAccessToken?: string
+    providerAccessToken: string
   ): Promise<UserProfileData> {
     const cleanPhone = normalizePhone(phone);
-    // The web/mobile widget verifies the one-time code with MSG91 and sends
-    // its signed access token here. Validate that token whenever supplied,
-    // even if the backend's OTP sender setting still defaults to Twilio.
-    if (providerAccessToken !== undefined && providerAccessToken !== '') {
-      if (typeof providerAccessToken !== 'string' || providerAccessToken.length < 20 || providerAccessToken.length > 5000) {
-        throw new Error('MSG91 verification is incomplete. Verify the code in the app and try again.');
-      }
-      const identifier = await msg91VerifyAccessToken(providerAccessToken);
-      const verifiedPhone = normalizePhone(identifier.startsWith('+') ? identifier : `+${identifier}`);
-      if (verifiedPhone !== cleanPhone) {
-        throw new Error('Invalid or expired verification code. Request a new code and try again.');
-      }
-    } else if (config.otpProvider === 'mock') {
-      if (typeof otp !== 'string' || !/^\d{6}$/.test(otp)) throw new Error('Enter the 6-digit verification code sent to your phone.');
-      const challenge = mockOtpChallenges.get(cleanPhone);
-      if (!challenge || challenge.expiresAt <= Date.now()) {
-        mockOtpChallenges.delete(cleanPhone);
-        throw new Error('Development code expired. Request a new code and try again.');
-      }
-      challenge.attempts += 1;
-      const candidateHash = hashMockOtp(otp);
-      if (challenge.attempts > MOCK_OTP_MAX_ATTEMPTS || !timingSafeEqual(challenge.codeHash, candidateHash)) {
-        if (challenge.attempts >= MOCK_OTP_MAX_ATTEMPTS) mockOtpChallenges.delete(cleanPhone);
-        throw new Error('Invalid or expired verification code. Request a new code and try again.');
-      }
-      mockOtpChallenges.delete(cleanPhone);
-    } else if (config.otpProvider === 'msg91') {
-      throw new Error('MSG91 verification is incomplete. Verify the code in the app and try again.');
-    } else {
-      if (typeof otp !== 'string' || !/^\d{6}$/.test(otp)) throw new Error('Enter the 6-digit verification code sent to your phone.');
-      const verification = await twilioVerify('VerificationCheck', { To: cleanPhone, Code: otp });
-      if (verification.status !== 'approved') throw new Error('Invalid or expired verification code. Request a new code and try again.');
+    if (typeof providerAccessToken !== 'string' || providerAccessToken.length < 20 || providerAccessToken.length > 5000) {
+      throw new Error('MSG91 access token is required. Verify the code in the app and try again.');
+    }
+    const identifier = await msg91VerifyAccessToken(providerAccessToken);
+    const verifiedPhone = normalizePhone(identifier.startsWith('+') ? identifier : `+${identifier}`);
+    if (verifiedPhone !== cleanPhone) {
+      throw new Error('The phone number verified by MSG91 does not match the number entered. Edit the number and request a new OTP.');
     }
 
     // Check if user exists
@@ -215,11 +140,16 @@ async function msg91VerifyAccessToken(accessToken: string): Promise<string> {
         body: JSON.stringify({ authkey: msg91AuthKey, 'access-token': accessToken }),
         signal: controller.signal,
       });
-    } catch {
+    } catch (cause) {
       // Only transport errors and timeouts should be reported as unreachable.
       // Keep MSG91's HTTP/body validation errors below so the route can return
       // the correct invalid-code or configuration response to the app.
-      throw new Error('Could not reach MSG91 verification. Please try again shortly.');
+      const error = new Error('Could not reach MSG91 verification. Please try again shortly.');
+      const causeCode = (cause as { cause?: { code?: unknown } })?.cause?.code;
+      if (typeof causeCode === 'string' && /^[A-Z0-9_]{1,32}$/.test(causeCode)) {
+        Object.assign(error, { providerDiagnosticCode: causeCode });
+      }
+      throw error;
     }
     const result = await response.json().catch(() => ({})) as { type?: string; message?: string; code?: string | number };
     // MSG91 can return HTTP 200 with an error payload, so check the body too.
@@ -238,10 +168,6 @@ async function msg91VerifyAccessToken(accessToken: string): Promise<string> {
   }
 }
 
-function hashMockOtp(code: string): Buffer {
-  return createHash('sha256').update(code).digest();
-}
-
 function normalizePhone(phone: string): string {
   if (typeof phone !== 'string') throw new Error('Please provide a valid phone number in international format.');
   if (!phone.trim().startsWith('+')) throw new Error('Include the country code, for example +919876543210.');
@@ -250,49 +176,4 @@ function normalizePhone(phone: string): string {
     throw new Error('Please provide a valid phone number in international format, including its country code.');
   }
   return `+${digits}`;
-}
-
-async function twilioVerify(resource: 'Verifications' | 'VerificationCheck', fields: Record<string, string>) {
-  const { twilioAccountSid, twilioAuthToken, twilioApiKeySid, twilioApiKeySecret, twilioVerifyServiceSid } = config;
-  const hasApiKeySettings = Boolean(twilioApiKeySid || twilioApiKeySecret);
-  const hasApiKeyPair = Boolean(twilioApiKeySid && twilioApiKeySecret);
-  const hasAccountCredentials = Boolean(twilioAccountSid && twilioAuthToken);
-  if (!twilioVerifyServiceSid || (hasApiKeySettings ? !hasApiKeyPair : !hasAccountCredentials)) {
-    throw new Error('SMS verification is not configured for this backend. Set TWILIO_VERIFY_SERVICE_SID and either TWILIO_API_KEY_SID plus TWILIO_API_KEY_SECRET, or TWILIO_ACCOUNT_SID plus TWILIO_AUTH_TOKEN in the backend environment (Render Environment for the live app; backend/.env for local development).');
-  }
-
-  const endpoint = `https://verify.twilio.com/v2/Services/${encodeURIComponent(twilioVerifyServiceSid)}/${resource}`;
-  const username = hasApiKeyPair ? twilioApiKeySid : twilioAccountSid;
-  const password = hasApiKeyPair ? twilioApiKeySecret : twilioAuthToken;
-  const credentials = Buffer.from(`${username}:${password}`).toString('base64');
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams(fields),
-      signal: controller.signal,
-    });
-    const result = await response.json().catch(() => ({})) as { status?: string; code?: number; message?: string };
-    if (resource === 'VerificationCheck' && response.status === 404) return { status: 'expired' };
-    if (!response.ok) {
-      if (response.status === 401 || result.code === 20003 || result.code === 8001) {
-        throw new Error(`Twilio authentication failed (code ${result.code ?? response.status}). Check the credentials in the backend environment: TWILIO_ACCOUNT_SID must match TWILIO_AUTH_TOKEN, or TWILIO_API_KEY_SID must match TWILIO_API_KEY_SECRET. Remove any stale or partial API key settings.`);
-      }
-      if (result.code === 21608) {
-        throw new Error('Twilio trial accounts can send verification SMS only to phone numbers verified in Twilio Console. Verify this recipient or use OTP_PROVIDER=mock for local development.');
-      }
-      throw new Error(`SMS verification service rejected the request${result.code ? ` (Twilio code ${result.code})` : ''}. Check the phone number, Verify service, and account status.`);
-    }
-    return result;
-  } catch (error) {
-    if (error instanceof Error && /^(SMS verification service rejected|Twilio authentication failed|Twilio trial accounts)/.test(error.message)) throw error;
-    throw new Error('Could not reach the SMS verification service. Please try again shortly.');
-  } finally {
-    clearTimeout(timeout);
-  }
 }

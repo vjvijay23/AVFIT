@@ -4,25 +4,13 @@ import { authenticatedUserId, requireAuth } from './auth-guard.js';
 import { pool } from '../db/index.js';
 
 export async function authRoutes(fastify: FastifyInstance) {
-  // Send OTP to phone
-  fastify.post<{ Body: { phone: string } }>('/otp/send', async (request, reply) => {
-    const { phone } = request.body || {};
-    try {
-      const res = await AuthService.requestOtp(phone);
-      return reply.send(res);
-    } catch (err: any) {
-      const unavailable = /SMS verification (is not configured|service rejected)|Twilio authentication failed|MSG91 (verification is not configured|authentication failed|could not validate)|Could not reach (the SMS|MSG91)/i.test(err.message || '');
-      return reply.status(unavailable ? 503 : 400).send({ error: err.message });
-    }
-  });
-
-  // Verify OTP and return profile + JWT
-  fastify.post<{ Body: { phone: string; otp?: string; accessToken?: string; authMode?: 'login' | 'signup'; profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string } } }>(
+  // Verify the MSG91 widget access token and return profile + JWT.
+  fastify.post<{ Body: { phone: string; accessToken?: string; authMode?: 'login' | 'signup'; profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string } } }>(
     '/otp/verify',
     async (request, reply) => {
-      const { phone, otp = '', accessToken, profile, authMode } = request.body || {};
+      const { phone, accessToken, profile, authMode } = request.body || {};
       try {
-        const user = await AuthService.verifyOtp(phone, otp, profile, authMode, accessToken);
+        const user = await AuthService.verifyOtp(phone, profile, authMode, accessToken || '');
         const token = fastify.jwt.sign({ id: user.id, phone: user.phone }, { expiresIn: '7d' });
         return reply.send({
           success: true,
@@ -31,9 +19,10 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
       } catch (err: any) {
         const message = err.message || '';
-        const unavailable = /SMS verification (is not configured|service rejected)|Twilio authentication failed|MSG91 (verification is not configured|authentication failed|could not validate)|Could not reach (the SMS|MSG91)/i.test(message);
-        const status = unavailable ? 503 : /Invalid or expired/.test(message) ? 401 : 400;
-        return reply.status(status).send({ error: message });
+        const unavailable = /MSG91 (verification is not configured|authentication failed|could not validate)|Could not reach MSG91/i.test(message);
+        const status = unavailable ? 503 : /Invalid or expired|MSG91 rejected the verification token|MSG91 access token is required|phone number verified by MSG91 does not match/i.test(message) ? 401 : 400;
+        const providerDiagnosticCode = typeof err.providerDiagnosticCode === 'string' ? err.providerDiagnosticCode : undefined;
+        return reply.status(status).send({ error: message, ...(providerDiagnosticCode ? { providerDiagnosticCode } : {}) });
       }
     }
   );

@@ -47,7 +47,7 @@
     <div class="flex items-center gap-1 overflow-x-auto py-0.5">
       <span class="text-[10px] text-[#6B726C] font-black uppercase mr-1">User:</span>
       <button onclick="switchUserAccount('alex')" id="btn-user-alex" class="px-2 py-0.5 rounded-full bg-[#244A32] text-white shadow-xs">
-        Alex Vance (Existing)
+        Sample Athlete (Prototype)
       </button>
       <button onclick="switchUserAccount('new_user')" id="btn-user-new" class="px-2 py-0.5 rounded-full bg-white text-[#191C1A] shadow-xs">
         ✨ New User (Starts at 0)
@@ -467,7 +467,7 @@
           Sign Up as New Athlete (Starts at 0)
         </button>
         <button onclick="switchUserAccount('alex'); switchTab('dashboard');" class="w-full bg-white border-2 border-[#E8DFC8] text-[#191C1A] py-3.5 rounded-2xl font-bold text-sm shadow-xs">
-          Log In as Existing Alex Vance (Has Data)
+          Open prototype sample profile
         </button>
       </div>
     </div>
@@ -532,7 +532,7 @@
     const usersDatabase = {
       alex: {
         id: 'usr_alex',
-        name: 'Alex Vance',
+        name: 'Sample Athlete',
         avatar: '🏃‍♂️',
         streakDays: 14,
         totalPoints: 850,

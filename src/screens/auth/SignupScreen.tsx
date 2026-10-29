@@ -117,7 +117,6 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           countryCode: selectedCountry.code,
           authMode: 'signup',
           pendingProfile: pendingData,
-          ...(response.developmentOtp ? { developmentOtp: response.developmentOtp } : {}),
         });
       }
     } catch (err: any) {
@@ -193,7 +192,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
             <User size={18} color={Colors.textSecondary} style={styles.inputIcon} />
             <TextInput
               style={styles.textInput}
-              placeholder="e.g. Alex Vance"
+              placeholder="e.g. Vijay Kumar"
               placeholderTextColor="#9EA6A0"
               value={fullName}
               onChangeText={(val) => {

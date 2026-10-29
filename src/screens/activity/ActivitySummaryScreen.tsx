@@ -54,39 +54,24 @@ export default function ActivitySummaryScreen({ route, navigation }: any) {
   const params = route.params || {};
 
   const sportType: SportType = params.sportType || 'running';
-  const [title, setTitle] = useState<string>(params.title || '10k Round the Houses 2024');
-  const [description, setDescription] = useState<string>(
-    params.description || 'Third year in a row with 10K PB ✅ Always nice to run with this team 🏃'
-  );
+  const [title, setTitle] = useState<string>(params.title || '');
+  const [description, setDescription] = useState<string>(params.description || '');
   const [privacy, setPrivacy] = useState<ActivityPrivacy>('followers');
   const [isSaving, setIsSaving] = useState(false);
   const [unlockedTrophies, setUnlockedTrophies] = useState<AchievementDefinition[]>([]);
   const [currentModalTrophy, setCurrentModalTrophy] = useState<AchievementDefinition | null>(null);
 
   // Stats
-  const activeDurationSec = params.activeDurationSec || 2270;
-  const elapsedDurationSec = params.elapsedDurationSec || 2270;
-  const distanceKm = params.distanceKm || 10.07;
-  const caloriesBurned = params.caloriesBurned || 620;
+  const activeDurationSec = params.activeDurationSec || 0;
+  const elapsedDurationSec = params.elapsedDurationSec || 0;
+  const distanceKm = params.distanceKm || 0;
+  const caloriesBurned = params.caloriesBurned || 0;
   const heartRate: HeartRateSummary | undefined = params.heartRate;
   const splits: KmSplit[] = params.splits || [];
-  const elevationGainMeters = params.elevationGainMeters || 5;
+  const elevationGainMeters = params.elevationGainMeters || 0;
 
   const routePoints: GPSPoint[] =
-    params.routePoints && params.routePoints.length > 2
-      ? params.routePoints
-      : [
-          { latitude: 56.002, longitude: -3.784, timestamp: 0 },
-          { latitude: 56.004, longitude: -3.787, timestamp: 1 },
-          { latitude: 56.007, longitude: -3.789, timestamp: 2 },
-          { latitude: 56.011, longitude: -3.785, timestamp: 3 },
-          { latitude: 56.013, longitude: -3.78, timestamp: 4 },
-          { latitude: 56.012, longitude: -3.774, timestamp: 5 },
-          { latitude: 56.008, longitude: -3.771, timestamp: 6 },
-          { latitude: 56.005, longitude: -3.773, timestamp: 7 },
-          { latitude: 56.003, longitude: -3.778, timestamp: 8 },
-          { latitude: 56.002, longitude: -3.784, timestamp: 9 },
-        ];
+    params.routePoints || [];
 
   // Pace calculations (3:45 /km)
   const calcAvgPace = () => {
@@ -186,9 +171,9 @@ export default function ActivitySummaryScreen({ route, navigation }: any) {
             <Text style={styles.athleteAvatarEmoji}>🏃‍♂️</Text>
           </View>
           <View style={styles.athleteMeta}>
-            <Text style={styles.athleteName}>Alex Vance</Text>
+            <Text style={styles.athleteName}>Your activity</Text>
             <Text style={styles.athleteDate}>
-              April 14, 2024 at 12:31 PM • Falkirk, Scotland
+              {new Date().toLocaleString()}
             </Text>
           </View>
         </View>

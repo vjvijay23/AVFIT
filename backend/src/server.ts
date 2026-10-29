@@ -71,7 +71,15 @@ export async function buildApp() {
     try { redisStatus = (await redis.ping()) === 'PONG'; } catch { /* health response reports dependency state */ }
     const healthy = postgres && redisStatus;
     if (!healthy) reply.status(503);
-    return { status: healthy ? 'healthy' : 'degraded', service: 'avfit-backend', timestamp: new Date().toISOString(), postgres, redis: redisStatus, otpProvider: config.otpProvider };
+    return {
+      status: healthy ? 'healthy' : 'degraded',
+      service: 'avfit-backend',
+      version: process.env.RENDER_GIT_COMMIT || 'local',
+      timestamp: new Date().toISOString(),
+      postgres,
+      redis: redisStatus,
+      otpProvider: 'msg91',
+    };
   });
 
   // 5. Register Subsystem Routes
@@ -97,7 +105,7 @@ export async function start() {
     const app = await buildApp();
     await app.listen({ port: config.port, host: config.host });
     console.log(`\n🚀 AVFIT Fastify Backend running on http://${config.host}:${config.port}`);
-    console.log(`🔐 OTP provider: ${config.otpProvider}`);
+    console.log('🔐 OTP provider: MSG91');
     console.log(`📚 Interactive API Docs (Swagger): http://localhost:${config.port}/documentation\n`);
     return app;
   } catch (err) {

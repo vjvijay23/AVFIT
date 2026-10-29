@@ -57,14 +57,9 @@ export const BackendApi = {
       return response.ok;
     } catch { return false; }
   },
-  sendOtp(phone: string) {
-    return apiRequest<{ success: boolean; message: string; phone: string; isMockOtp?: boolean; developmentOtp?: string }>('/auth/otp/send', {
-      method: 'POST', authenticated: false, body: JSON.stringify({ phone }),
-    });
-  },
-  async verifyOtp(phone: string, otp: string, profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string }, authMode: 'login' | 'signup' = 'login', accessToken?: string) {
+  async verifyOtp(phone: string, accessToken: string, profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string }, authMode: 'login' | 'signup' = 'login') {
     const result = await apiRequest<{ success: boolean; token: string; user: { id: string; phone: string; fullName: string; avatarUrl?: string | null; dateOfBirth?: string | null; gender?: string | null; country?: string | null; preferredUnits?: string | null; streakCount: number; isOnboarded?: boolean; isNewUser?: boolean } }>('/auth/otp/verify', {
-      method: 'POST', authenticated: false, body: JSON.stringify({ phone, otp, accessToken, profile, authMode }),
+      method: 'POST', authenticated: false, body: JSON.stringify({ phone, accessToken, profile, authMode }),
     });
     authToken = result.token;
     await saveAuthSession({ token: result.token, userId: result.user.id });

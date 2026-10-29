@@ -109,7 +109,7 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
         const user = await AuthService.getUserProfile();
         const fitness = await FitnessProfileService.getFitnessProfile();
 
-        setFullName(user.fullName || 'Alex Vance');
+        setFullName(user.fullName || '');
         setPhone(user.phone || '');
         setDateOfBirth(user.dateOfBirth?.slice(0, 10) || '');
         setGender(user.gender || 'prefer_not_to_say');

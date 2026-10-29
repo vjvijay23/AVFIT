@@ -1,4 +1,3 @@
-import { supabase } from './supabase';
 import { AuthUser, PhoneAuthRequest, OtpVerifyRequest, UserProfile, Gender } from '../types';
 import { UserStore } from './userStore';
 import { BackendApi } from './backendApi';
@@ -17,13 +16,6 @@ export interface PendingSignupData {
 
 // Active session holder in memory (null by default so new sessions do not inherit another user's data)
 let currentActiveUserId: string | null = null;
-
-// Phone to User ID mapping for returning logins
-const phoneToUserIdMap: Record<string, string> = {
-  '+1 (555) 019-2834': 'usr_vyalwin_001',
-  '+15550192834': 'usr_vyalwin_001',
-  '+919876543210': 'usr_vyalwin_001',
-};
 
 export const AuthService = {
   async restoreSession(): Promise<boolean> {
@@ -45,24 +37,14 @@ export const AuthService = {
   async sendPhoneOtp(
     request: PhoneAuthRequest,
     _authMode: 'login' | 'signup' = 'login'
-  ): Promise<{ success: boolean; message: string; isMock: boolean; developmentOtp?: string }> {
+  ): Promise<{ success: boolean; message: string }> {
     const fullPhone = request.phone.trim();
     if (!fullPhone || fullPhone.length < 8) {
       throw new Error('Please enter a valid mobile phone number with country code.');
     }
 
-    if (process.env.EXPO_PUBLIC_OTP_PROVIDER === 'msg91') {
-      await Msg91Otp.sendOtp(fullPhone);
-      return { success: true, message: 'Verification code sent by MSG91.', isMock: false };
-    }
-
-    const response = await BackendApi.sendOtp(fullPhone);
-    return {
-      success: true,
-      message: response.message,
-      isMock: Boolean(response.isMockOtp),
-      ...(response.developmentOtp ? { developmentOtp: response.developmentOtp } : {}),
-    };
+    await Msg91Otp.sendOtp(fullPhone);
+    return { success: true, message: 'Verification code sent by MSG91.' };
   },
 
   /**
@@ -82,14 +64,11 @@ export const AuthService = {
       throw new Error(`Please enter the complete ${OTP_CODE_LENGTH}-digit verification code.`);
     }
 
-    const accessToken = process.env.EXPO_PUBLIC_OTP_PROVIDER === 'msg91'
-      ? await Msg91Otp.verifyOtp(phone, cleanToken)
-      : undefined;
-    const response = await BackendApi.verifyOtp(phone, accessToken ? '' : cleanToken, pendingProfile, authMode, accessToken);
+    const accessToken = await Msg91Otp.verifyOtp(phone, cleanToken);
+    const response = await BackendApi.verifyOtp(phone, accessToken, pendingProfile, authMode);
     const isNewUser = response.user.isNewUser ?? authMode === 'signup';
     const userId = response.user.id;
     currentActiveUserId = userId;
-    phoneToUserIdMap[phone] = userId;
     const existing = UserStore.getProfile(userId);
     const profile = existing || UserStore.initializeNewUser(
       userId,
@@ -131,12 +110,9 @@ export const AuthService = {
     };
   },
 
-  async resendPhoneOtp(request: PhoneAuthRequest): Promise<{ success: boolean; message: string; isMock: boolean; developmentOtp?: string }> {
-    if (process.env.EXPO_PUBLIC_OTP_PROVIDER === 'msg91') {
-      await Msg91Otp.resendOtp(request.phone);
-      return { success: true, message: 'A new verification code was sent by MSG91.', isMock: false };
-    }
-    return this.sendPhoneOtp(request);
+  async resendPhoneOtp(request: PhoneAuthRequest): Promise<{ success: boolean; message: string }> {
+    await Msg91Otp.resendOtp(request.phone);
+    return { success: true, message: 'A new verification code was sent by MSG91.' };
   },
 
   /**
@@ -163,45 +139,29 @@ export const AuthService = {
   async getUserProfile(userId?: string): Promise<UserProfile> {
     const targetId = userId || currentActiveUserId;
     if (!targetId) {
-      // Default initial zero-state athlete profile
-      return {
-        id: 'usr_guest',
-        phone: '',
-        fullName: 'Athlete',
-        avatarUrl: '🏃‍♂️',
-        age: 24,
-        country: 'United States',
-        preferredUnits: 'metric',
-        isOnboarded: false,
-        streakCount: 0,
-        totalPoints: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      throw new Error('Sign in to view your profile.');
     }
     let profile = UserStore.getProfile(targetId);
 
     if (BackendApi.hasAuthToken() && targetId === currentActiveUserId) {
-      try {
-        const result = await BackendApi.getProfile(targetId);
-        const row = result.profile;
-        profile = {
-          ...(profile || UserStore.initializeNewUser(targetId, row.phone || '', row.full_name || 'Athlete')),
-          id: String(row.id), phone: row.phone || '', fullName: row.full_name || profile?.fullName || 'Athlete',
-          avatarUrl: row.avatar_url || undefined, dateOfBirth: row.date_of_birth || undefined,
-          age: ageFromDateOfBirth(row.date_of_birth) || profile?.age,
-          gender: row.gender || undefined, country: row.country || 'United States',
-          preferredUnits: row.preferred_units || 'metric', isOnboarded: Boolean(row.is_onboarded),
-          streakCount: Number(row.streak_count || 0), totalPoints: Number(row.total_trophy_points || 0),
-          createdAt: row.created_at || profile?.createdAt || new Date().toISOString(),
-          updatedAt: row.updated_at || new Date().toISOString(),
-        };
-        UserStore.saveProfile(profile);
-      } catch { /* Keep the cached profile available while the backend is offline. */ }
+      const result = await BackendApi.getProfile(targetId);
+      const row = result.profile;
+      profile = {
+        ...(profile || {} as UserProfile),
+        id: String(row.id), phone: row.phone || '', fullName: row.full_name || profile?.fullName || '',
+        avatarUrl: row.avatar_url || undefined, dateOfBirth: row.date_of_birth || undefined,
+        age: ageFromDateOfBirth(row.date_of_birth) || profile?.age,
+        gender: row.gender || undefined, country: row.country || '',
+        preferredUnits: row.preferred_units || 'metric', isOnboarded: Boolean(row.is_onboarded),
+        streakCount: Number(row.streak_count || 0), totalPoints: Number(row.total_trophy_points || 0),
+        createdAt: row.created_at || profile?.createdAt || new Date().toISOString(),
+        updatedAt: row.updated_at || new Date().toISOString(),
+      };
+      UserStore.saveProfile(profile);
     }
 
     if (!profile) {
-      profile = UserStore.initializeNewUser(targetId, '', 'Athlete');
+      throw new Error('Profile was not found in the database. Sign in again or complete account signup.');
     }
 
     return profile;
@@ -211,7 +171,8 @@ export const AuthService = {
    * Save or update user profile.
    */
   async saveUserProfile(profileData: Partial<UserProfile>): Promise<UserProfile> {
-    const targetId = profileData.id || currentActiveUserId || 'usr_guest';
+    const targetId = profileData.id || currentActiveUserId;
+    if (!targetId) throw new Error('Sign in before saving profile changes.');
     const existing = await this.getUserProfile(targetId);
 
     const updated: UserProfile = {
@@ -239,11 +200,6 @@ export const AuthService = {
    * Sign out the user, clearing session.
    */
   async signOut(): Promise<void> {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      // Ignore
-    }
     currentActiveUserId = null;
     await BackendApi.signOut();
   },

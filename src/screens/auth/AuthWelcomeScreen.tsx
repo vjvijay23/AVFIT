@@ -120,14 +120,6 @@ export default function AuthWelcomeScreen({ navigation }: AuthWelcomeScreenProps
             <Text style={styles.loginButtonText}>I Already Have an Account • Log In</Text>
           </TouchableOpacity>
 
-          {/* Guest / Demo Mode */}
-          <TouchableOpacity
-            style={styles.guestButton}
-            onPress={() => navigation.navigate('Main')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.guestButtonText}>Explore App as Guest (Demo Mode)</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Security Assurance */}
@@ -284,16 +276,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: Colors.textPrimary,
-  },
-  guestButton: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  guestButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-    textDecorationLine: 'underline',
   },
   securityRow: {
     flexDirection: 'row',

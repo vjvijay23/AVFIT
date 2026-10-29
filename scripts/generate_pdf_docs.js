@@ -702,47 +702,12 @@ RootNavigator (NativeStackNavigator)
     1. <strong>60-Second Cooldown:</strong> Enforces an unskippable 60-second hardware countdown before any resend SMS request can be triggered, preventing SMS toll fraud.<br>
     2. <strong>Regulatory Carrier Consent:</strong> Explicit notice displayed prior to OTP dispatch: <em>"By proceeding, you agree to receive SMS verification codes. Standard carrier rates may apply."</em><br>
     3. <strong>Auto-Advancing Cells:</strong> Six discrete text inputs that detect single-digit input, advance cursor focus to the next cell immediately, and cleanly handle backspaces.<br>
-    4. <strong>Provider-Managed Codes:</strong> Twilio Verify generates, delivers, expires, and validates the SMS code. AVFIT never returns or stores a fixed OTP.
+    4. <strong>MSG91-Managed Codes:</strong> The MSG91 client widget sends and verifies the SMS code. The backend validates the returned access token with the same MSG91 account before it reads or writes a profile. AVFIT does not return, log, or store the OTP.
   </div>
 
-  <h2>4.2 Supabase OTP Implementation Contract</h2>
-  <p>
-    The client communicates with Supabase Auth via <code>src/services/auth.ts</code>:
+  <h2>4.2 MSG91 Widget and Backend Verification</h2>
+  <p>The client sends and verifies the six-digit OTP with the MSG91 widget. MSG91 returns a short-lived access token after successful verification; the client sends that token and the E.164 phone number to <code>POST /api/v1/auth/otp/verify</code>. The backend validates the token with the MSG91 Authkey, checks that the verified phone matches, and then reads or creates the PostgreSQL profile. AVFIT never receives the raw OTP.
   </p>
-  <pre><code>// 1. Dispatch OTP SMS Request
-export async function sendOtp(phone: string): Promise&lt;{ success: boolean; error?: string }&gt; {
-  const formattedPhone = phone.trim();
-  const { error } = await supabase.auth.signInWithOtp({
-    phone: formattedPhone,
-  });
-  if (error) return { success: false, error: error.message };
-  return { success: true };
-}
-
-// 2. Verify 6-Digit Code and Exchange for JWT Session
-export async function verifyOtp(
-  phone: string, 
-  token: string
-): Promise&lt;{ session: Session | null; isNewUser: boolean; error?: string }&gt; {
-  const { data, error } = await supabase.auth.verifyOtp({
-    phone,
-    token,
-    type: 'sms',
-  });
-  if (error) return { session: null, isNewUser: false, error: error.message };
-  
-  // Query profile to determine if onboarding wizard is required
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_onboarded')
-    .eq('id', data.user?.id)
-    .single();
-
-  return { 
-    session: data.session, 
-    isNewUser: !profile || !profile.is_onboarded 
-  };
-}</code></pre>
 
   <!-- SECTION 5 -->
   <h1>5. Scientific Metabolic Profiling (Mifflin-St Jeor)</h1>
