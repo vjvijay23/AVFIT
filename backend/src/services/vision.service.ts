@@ -32,6 +32,7 @@ export class VisionServiceError extends Error {
       status?: number;
       code?: string;
       message?: string;
+      model?: string;
     },
   ) {
     super(message);
@@ -77,7 +78,7 @@ const foodNutritionResponseSchema: ResponseSchema = {
   ],
 };
 
-function safeProviderDiagnostic(cause: any) {
+function safeProviderDiagnostic(cause: any, model?: string) {
   const apiKey = config.geminiApiKey;
   const rawMessage = String(cause?.message || 'No provider message');
   const message = rawMessage
@@ -90,6 +91,7 @@ function safeProviderDiagnostic(cause: any) {
     status: Number(cause?.status || cause?.statusCode) || undefined,
     code: typeof detail?.reason === 'string' ? detail.reason.slice(0, 120) : undefined,
     message,
+    model,
   };
 }
 
@@ -133,11 +135,6 @@ export class VisionService {
       // Avoid custom sampling parameters here: Gemini 3.6+ ignores these and
       // newer API revisions may reject them. The schema keeps the response compact.
     };
-    const model = genAI.getGenerativeModel({
-      model: config.geminiModel,
-      generationConfig,
-    });
-
     const prompt = 'Estimate the visible meal and portion from this photo. Return only JSON with fields dish_name, estimated_weight_g, calories, protein_g, carbs_g, fat_g, fiber_g, sugars_g, saturated_fat_g, sodium_mg, cholesterol_mg, confidence (high|medium|low), health_tips, and ingredients (up to 8 objects with name, weight_g, calories). Use realistic estimates; a photo cannot reveal hidden ingredients. Keep health_tips brief.';
 
     const imagePart = {
@@ -147,17 +144,35 @@ export class VisionService {
       },
     };
 
-    let responseText: string;
+    let responseText = '';
+    let failedModel = config.geminiModel;
     try {
-      // Mobile networks and cold provider requests can exceed 8 seconds. Keep a
-      // finite timeout, but do not turn normal Gemini latency into a scan failure.
-      const response = await model.generateContent([prompt, imagePart], { timeout: GEMINI_ANALYSIS_TIMEOUT_MS });
-      responseText = response.response.text();
+      // If the primary model is overloaded, fail over once to a supported,
+      // multimodal low-latency model. Keep both attempts bounded by the timeout.
+      const modelNames = [...new Set([config.geminiModel, config.geminiFallbackModel].filter(Boolean))];
+      let lastCause: any;
+      for (let index = 0; index < modelNames.length; index += 1) {
+        const modelName = modelNames[index];
+        const model = genAI.getGenerativeModel({ model: modelName, generationConfig });
+        try {
+          const response = await model.generateContent([prompt, imagePart], { timeout: GEMINI_ANALYSIS_TIMEOUT_MS });
+          responseText = response.response.text();
+          break;
+        } catch (cause: any) {
+          lastCause = cause;
+          failedModel = modelName;
+          const providerStatus = Number(cause?.status || cause?.statusCode || 0);
+          // Fail over only on provider server failures; do not hide key, billing,
+          // quota, model-configuration, or malformed-request errors.
+          if (providerStatus < 500 || providerStatus > 599 || index === modelNames.length - 1) throw cause;
+        }
+      }
+      if (!responseText) throw lastCause || new Error('Gemini returned an empty response.');
     } catch (cause: any) {
-      const diagnostic = safeProviderDiagnostic(cause);
+      const diagnostic = safeProviderDiagnostic(cause, failedModel);
       const status = diagnostic.status || 0;
       const message = String(cause?.message || '').toLowerCase();
-      if (message.includes('timeout') || message.includes('timed out') || message.includes('deadline')) {
+      if (cause?.name === 'GoogleGenerativeAIAbortError' || message.includes('timeout') || message.includes('timed out') || message.includes('deadline')) {
         throw new VisionServiceError('Food scan took too long. Please try again on a stable connection.', 504, diagnostic);
       }
       if (status === 429) {

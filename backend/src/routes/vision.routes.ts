@@ -37,6 +37,7 @@ export async function visionRoutes(fastify: FastifyInstance) {
         providerStatus: err?.providerDiagnostic?.status,
         providerCode: err?.providerDiagnostic?.code,
         providerMessage: err?.providerDiagnostic?.message,
+        providerModel: err?.providerDiagnostic?.model,
       }, 'Food image analysis failed');
       const statusCode = (err as Error & { statusCode?: number }).statusCode || 502;
       return reply.status(statusCode).send({
