@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType, type ResponseSchema } from '@google/generative-ai';
 import { config } from '../config/index.js';
 import { redis } from '../db/index.js';
 
@@ -25,10 +25,72 @@ export interface NutritionEstimate {
 }
 
 export class VisionServiceError extends Error {
-  constructor(message: string, public readonly statusCode: number) {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+    public readonly providerDiagnostic?: {
+      status?: number;
+      code?: string;
+      message?: string;
+    },
+  ) {
     super(message);
     this.name = 'VisionServiceError';
   }
+}
+
+const GEMINI_ANALYSIS_TIMEOUT_MS = 20_000;
+
+const foodNutritionResponseSchema: ResponseSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    dish_name: { type: SchemaType.STRING },
+    estimated_weight_g: { type: SchemaType.NUMBER },
+    calories: { type: SchemaType.NUMBER },
+    protein_g: { type: SchemaType.NUMBER },
+    carbs_g: { type: SchemaType.NUMBER },
+    fat_g: { type: SchemaType.NUMBER },
+    fiber_g: { type: SchemaType.NUMBER },
+    sugars_g: { type: SchemaType.NUMBER },
+    saturated_fat_g: { type: SchemaType.NUMBER },
+    sodium_mg: { type: SchemaType.NUMBER },
+    cholesterol_mg: { type: SchemaType.NUMBER },
+    confidence: { type: SchemaType.STRING, format: 'enum', enum: ['high', 'medium', 'low'] },
+    health_tips: { type: SchemaType.STRING },
+    ingredients: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          name: { type: SchemaType.STRING },
+          weight_g: { type: SchemaType.NUMBER },
+          calories: { type: SchemaType.NUMBER },
+        },
+        required: ['name', 'weight_g', 'calories'],
+      },
+    },
+  },
+  required: [
+    'dish_name', 'estimated_weight_g', 'calories', 'protein_g', 'carbs_g', 'fat_g',
+    'fiber_g', 'sugars_g', 'saturated_fat_g', 'sodium_mg', 'cholesterol_mg',
+    'confidence', 'health_tips', 'ingredients',
+  ],
+};
+
+function safeProviderDiagnostic(cause: any) {
+  const apiKey = config.geminiApiKey;
+  const rawMessage = String(cause?.message || 'No provider message');
+  const message = rawMessage
+    .replaceAll(apiKey, '[redacted]')
+    .replace(/([?&]key=)[^&\s]+/gi, '$1[redacted]')
+    .replace(/\b[A-Za-z0-9+/=_-]{120,}\b/g, '[redacted data]')
+    .slice(0, 600);
+  const detail = Array.isArray(cause?.errorDetails) ? cause.errorDetails[0] : undefined;
+  return {
+    status: Number(cause?.status || cause?.statusCode) || undefined,
+    code: typeof detail?.reason === 'string' ? detail.reason.slice(0, 120) : undefined,
+    message,
+  };
 }
 
 export class VisionService {
@@ -66,10 +128,11 @@ export class VisionService {
     const genAI = new GoogleGenerativeAI(config.geminiApiKey);
     const generationConfig = {
       responseMimeType: 'application/json',
-      temperature: 0.2,
-      // Gemini 3 models support low thinking to reduce latency for straightforward extraction.
-      thinkingConfig: { thinkingLevel: 'low' },
-    } as GenerationConfig;
+      responseSchema: foodNutritionResponseSchema,
+      maxOutputTokens: 1200,
+      // Avoid custom sampling parameters here: Gemini 3.6+ ignores these and
+      // newer API revisions may reject them. The schema keeps the response compact.
+    };
     const model = genAI.getGenerativeModel({
       model: config.geminiModel,
       generationConfig,
@@ -84,25 +147,43 @@ export class VisionService {
       },
     };
 
-    let nutrition: NutritionEstimate;
+    let responseText: string;
     try {
-      // Bound upstream latency so a hung provider request does not leave the scanner spinning indefinitely.
-      const response = await model.generateContent([prompt, imagePart], { timeout: 8500 });
-      const responseText = response.response.text();
-      nutrition = this.normalizeNutrition(JSON.parse(responseText));
+      // Mobile networks and cold provider requests can exceed 8 seconds. Keep a
+      // finite timeout, but do not turn normal Gemini latency into a scan failure.
+      const response = await model.generateContent([prompt, imagePart], { timeout: GEMINI_ANALYSIS_TIMEOUT_MS });
+      responseText = response.response.text();
     } catch (cause: any) {
-      const status = Number(cause?.status || cause?.statusCode || 0);
+      const diagnostic = safeProviderDiagnostic(cause);
+      const status = diagnostic.status || 0;
       const message = String(cause?.message || '').toLowerCase();
       if (message.includes('timeout') || message.includes('timed out') || message.includes('deadline')) {
-        throw new VisionServiceError('Food scan timed out. Please retry on a stable connection.', 504);
+        throw new VisionServiceError('Food scan took too long. Please try again on a stable connection.', 504, diagnostic);
       }
       if (status === 429) {
-        throw new VisionServiceError('Food scanning is temporarily busy. Please try again shortly.', 503);
+        throw new VisionServiceError('Food scanning is temporarily busy. Please try again shortly.', 503, diagnostic);
       }
       if (status === 401 || status === 403) {
-        throw new VisionServiceError('Food scanning service access is not configured correctly. Please contact support.', 503);
+        throw new VisionServiceError('Food scanner access is not configured correctly. Check the Gemini API key and project access.', 503, diagnostic);
       }
-      throw new VisionServiceError('Could not analyze this photo. Choose a clear, well-lit image and try again.', 502);
+      if (status === 400 || status === 404) {
+        throw new VisionServiceError('Gemini rejected the food scan request. Check the backend model setting and try again.', 503, diagnostic);
+      }
+      if (status >= 500) {
+        throw new VisionServiceError('Gemini is temporarily unavailable. Please try the food scan again shortly.', 503, diagnostic);
+      }
+      throw new VisionServiceError('Could not analyze this photo. Please try again with a clear food photo.', 502, diagnostic);
+    }
+
+    let nutrition: NutritionEstimate;
+    try {
+      nutrition = this.normalizeNutrition(JSON.parse(responseText));
+    } catch (cause: any) {
+      throw new VisionServiceError(
+        'Gemini returned an unreadable nutrition estimate. Please try scanning the photo again.',
+        502,
+        { message: String(cause?.message || 'Invalid nutrition response').slice(0, 300) },
+      );
     }
 
     // Cache asynchronously so Redis latency cannot delay the scan result.

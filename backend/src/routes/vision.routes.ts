@@ -29,7 +29,15 @@ export async function visionRoutes(fastify: FastifyInstance) {
         data: result,
       });
     } catch (err: any) {
-      request.log.error({ errorName: err?.name, statusCode: err?.statusCode }, 'Food image analysis failed');
+      // Keep provider status/details in Render logs so upstream failures can be
+      // fixed without logging the user's image, authorization header, or API key.
+      request.log.error({
+        errorName: err?.name,
+        statusCode: err?.statusCode,
+        providerStatus: err?.providerDiagnostic?.status,
+        providerCode: err?.providerDiagnostic?.code,
+        providerMessage: err?.providerDiagnostic?.message,
+      }, 'Food image analysis failed');
       const statusCode = (err as Error & { statusCode?: number }).statusCode || 502;
       return reply.status(statusCode).send({
         error: err instanceof VisionServiceError
