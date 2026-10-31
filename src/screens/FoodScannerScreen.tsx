@@ -131,10 +131,9 @@ export default function FoodScannerScreen({ navigation }: any) {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        // Crop in the picker; resize/compress and encode only once in the native
-        // image pipeline after selection.
+        // Keep the original composition visible; image preparation is handled
+        // automatically after selection without opening the native crop editor.
+        allowsEditing: false,
         quality: 1,
         base64: false,
       });
@@ -157,8 +156,7 @@ export default function FoodScannerScreen({ navigation }: any) {
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsEditing: false,
         quality: 1,
         base64: false,
       });
@@ -183,7 +181,6 @@ export default function FoodScannerScreen({ navigation }: any) {
     try {
       await nextFrame();
       const prepared = await prepareFoodImage(asset);
-      setSelectedImageUri(prepared.uri);
       setScanStage('Uploading the compressed photo securely…');
       await nextFrame();
       const result = await BackendApi.scanFood(prepared.base64, prepared.mimeType, () => {
@@ -280,13 +277,13 @@ export default function FoodScannerScreen({ navigation }: any) {
         {/* Viewfinder Camera Box */}
         <View style={styles.cameraBox}>
           {selectedImageUri ? (
-            <Image source={{ uri: selectedImageUri }} style={styles.previewImage} resizeMode="cover" />
+            <Image source={{ uri: selectedImageUri }} style={styles.previewImage} resizeMode="contain" />
           ) : (
             <View style={styles.viewfinderCenter}>
               <View style={styles.cameraIconCircle}>
                 <CameraIcon size={30} color={Colors.primary} />
               </View>
-              <Text style={styles.cameraPrompt}>Align meal plate inside viewfinder</Text>
+              <Text style={styles.cameraPrompt}>Photograph the full meal in good light</Text>
             </View>
           )}
 
@@ -463,7 +460,8 @@ const styles = StyleSheet.create({
   },
   categoryPill: {
     flex: 1,
-    paddingVertical: 8,
+    minHeight: 46,
+    paddingVertical: 10,
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -475,7 +473,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   categoryText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.textSecondary,
   },
@@ -483,9 +481,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   cameraBox: {
-    height: 220,
+    height: 250,
     backgroundColor: '#1C2B22',
-    borderRadius: 22,
+    borderRadius: 26,
     overflow: 'hidden',
     position: 'relative',
     justifyContent: 'center',
@@ -495,6 +493,7 @@ const styles = StyleSheet.create({
   previewImage: {
     width: '100%',
     height: '100%',
+    backgroundColor: '#1C2B22',
   },
   viewfinderCenter: {
     alignItems: 'center',
@@ -509,7 +508,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   cameraPrompt: {
-    fontSize: 13,
+    fontSize: 15,
     color: '#E0E7E3',
     fontWeight: '700',
   },
@@ -536,13 +535,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
-    paddingVertical: 12,
-    borderRadius: 16,
+    minHeight: 54,
+    paddingVertical: 14,
+    borderRadius: 17,
     gap: 6,
   },
   captureBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
   },
   galleryBtn: {
@@ -551,15 +551,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    borderRadius: 16,
+    minHeight: 54,
+    paddingVertical: 14,
+    borderRadius: 17,
     borderWidth: 1,
     borderColor: '#E8DFC8',
     gap: 6,
   },
   galleryBtnText: {
     color: Colors.textPrimary,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
   },
   resultCard: {
@@ -610,7 +611,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   calorieBigNumber: {
-    fontSize: 26,
+    fontSize: 34,
     fontWeight: '900',
     color: Colors.primary,
   },
@@ -655,12 +656,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   macroValue: {
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '900',
     color: Colors.textPrimary,
   },
   macroLabel: {
-    fontSize: 11,
+    fontSize: 13,
     color: Colors.textSecondary,
     fontWeight: '600',
     marginTop: 2,

@@ -74,7 +74,7 @@ export default function AuthWelcomeScreen({ navigation }: AuthWelcomeScreenProps
             </View>
             <View style={styles.featureTextBox}>
               <Text style={styles.featureTitle}>AI Food Scanner & Macros</Text>
-              <Text style={styles.featureSub}>Instant plate recognition, calories, protein, carbs, and fats</Text>
+              <Text style={styles.featureSub}>Meal calories, macros, and a personalized weekly diet chart</Text>
             </View>
           </View>
 
@@ -126,7 +126,7 @@ export default function AuthWelcomeScreen({ navigation }: AuthWelcomeScreenProps
         <View style={styles.securityRow}>
           <ShieldCheck size={14} color={Colors.primary} />
           <Text style={styles.securityText}>
-            Secured by Supabase Phone Auth. Sensitive health metrics private by default.
+            MSG91 verifies your number. Use a PIN for routine sign-in and OTP only for recovery.
           </Text>
         </View>
       </ScrollView>

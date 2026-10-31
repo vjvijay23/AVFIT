@@ -40,7 +40,21 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
 
 export const BackendApi = {
   setAuthToken(token: string | null) { authToken = token; },
+  clearAuthToken() { authToken = null; },
   hasAuthToken() { return Boolean(authToken); },
+  async loginWithPin(phone: string, pin: string) {
+    const result = await apiRequest<{ success: boolean; token: string; user: Record<string, any> }>('/auth/pin/login', {
+      method: 'POST', authenticated: false, body: JSON.stringify({ phone, pin }),
+    });
+    authToken = result.token;
+    await saveAuthSession({ token: result.token, userId: String(result.user.id) });
+    return result;
+  },
+  setPin(pin: string, confirmation: string) {
+    return apiRequest<{ success: boolean; user: Record<string, any> }>('/auth/pin/set', {
+      method: 'POST', body: JSON.stringify({ pin, confirmation }),
+    });
+  },
   async restoreAuthSession(): Promise<string | null> {
     if (Platform.OS === 'web') return null;
     try {
@@ -64,7 +78,7 @@ export const BackendApi = {
     } catch { return false; }
   },
   async verifyOtp(phone: string, accessToken: string, profile?: { fullName?: string; dateOfBirth?: string; gender?: string; avatarUrl?: string; country?: string }, authMode: 'login' | 'signup' = 'login') {
-    const result = await apiRequest<{ success: boolean; token: string; user: { id: string; phone: string; fullName: string; avatarUrl?: string | null; dateOfBirth?: string | null; gender?: string | null; country?: string | null; preferredUnits?: string | null; streakCount: number; isOnboarded?: boolean; isNewUser?: boolean } }>('/auth/otp/verify', {
+    const result = await apiRequest<{ success: boolean; token: string; user: { id: string; phone: string; fullName: string; avatarUrl?: string | null; dateOfBirth?: string | null; gender?: string | null; country?: string | null; preferredUnits?: string | null; streakCount: number; isOnboarded?: boolean; isNewUser?: boolean; hasPin?: boolean } }>('/auth/otp/verify', {
       method: 'POST', authenticated: false, body: JSON.stringify({ phone, accessToken, profile, authMode }),
     });
     authToken = result.token;
@@ -76,6 +90,21 @@ export const BackendApi = {
   },
   getProfile(id: string) {
     return apiRequest<{ success: boolean; profile: Record<string, any> }>(`/auth/profile/${encodeURIComponent(id)}`);
+  },
+  profilePhotoSource(id: string, photoUpdatedAt?: string) {
+    const version = photoUpdatedAt ? `?v=${encodeURIComponent(photoUpdatedAt)}` : '';
+    return authToken ? {
+      uri: `${API_BASE_URL}/auth/profile/${encodeURIComponent(id)}/avatar${version}`,
+      headers: { Authorization: `Bearer ${authToken}` },
+    } : undefined;
+  },
+  uploadProfilePhoto(imageBase64: string, mimeType: string) {
+    return apiRequest<{ success: boolean; updatedAt: string }>('/auth/profile/avatar', {
+      method: 'PUT', body: JSON.stringify({ imageBase64, mimeType }),
+    });
+  },
+  deleteProfilePhoto() {
+    return apiRequest<{ success: boolean }>('/auth/profile/avatar', { method: 'DELETE' });
   },
   recordActivity(activity: {
     userId: string; sportType: string; title: string; durationSec: number; distanceKm: number;

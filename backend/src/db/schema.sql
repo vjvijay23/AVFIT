@@ -19,6 +19,16 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS date_of_birth DATE;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS country TEXT NOT NULL DEFAULT 'US';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS preferred_units TEXT NOT NULL DEFAULT 'metric';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_onboarded BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pin_hash TEXT;
+
+-- Private profile photos are stored separately so the public avatar_url can
+-- continue to hold the existing community emoji/avatar value.
+CREATE TABLE IF NOT EXISTS profile_photos (
+    user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+    image_data BYTEA NOT NULL,
+    mime_type TEXT NOT NULL CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp')),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- 2. RECORDED ACTIVITIES (Strava-style with PostGIS LineString)
 CREATE TABLE IF NOT EXISTS recorded_activities (

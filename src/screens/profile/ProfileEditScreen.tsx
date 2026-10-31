@@ -28,6 +28,9 @@ import {
 import { AuthService } from '../../services/auth';
 import { BackendApi } from '../../services/backendApi';
 import DateOfBirthPicker from '../../components/common/DateOfBirthPicker';
+import ProfileAvatar from '../../components/common/ProfileAvatar';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import {
   User,
   Shield,
@@ -39,6 +42,7 @@ import {
   AlertCircle,
   Check,
   LogOut,
+  Camera,
 } from 'lucide-react-native';
 
 interface ProfileEditScreenProps {
@@ -72,6 +76,10 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('Changes save automatically');
+  const [hasProfilePhoto, setHasProfilePhoto] = useState(false);
+  const [photoUpdatedAt, setPhotoUpdatedAt] = useState<string>();
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   // Form states
   const [fullName, setFullName] = useState('');
@@ -113,6 +121,9 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
         setPhone(user.phone || '');
         setDateOfBirth(user.dateOfBirth?.slice(0, 10) || '');
         setGender(user.gender || 'prefer_not_to_say');
+        setHasProfilePhoto(Boolean(user.hasProfilePhoto));
+        setPhotoUpdatedAt(user.photoUpdatedAt);
+        setBiometricEnabled(await AuthService.isBiometricLoginEnabled());
 
         setHeightCm(fitness.heightCm.toString());
         setWeightKg(fitness.weightKg.toString());
@@ -284,6 +295,46 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
     }
   };
 
+  const handlePickProfilePhoto = async () => {
+    if (!BackendApi.hasAuthToken()) { Alert.alert('Sign in required', 'Sign in again to save a profile photo.'); return; }
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== 'granted') { Alert.alert('Photo permission', 'Allow AVFIT to access your photo library to choose a profile photo.'); return; }
+    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 1 });
+    if (picked.canceled || !picked.assets[0]) return;
+    setPhotoLoading(true);
+    try {
+      const asset = picked.assets[0];
+      const side = Math.min(asset.width || 512, asset.height || 512);
+      const originX = Math.floor(((asset.width || side) - side) / 2);
+      const originY = Math.floor(((asset.height || side) - side) / 2);
+      const prepared = await ImageManipulator.manipulateAsync(asset.uri, [
+        { crop: { originX, originY, width: side, height: side } },
+        { resize: { width: 512, height: 512 } },
+      ], { compress: 0.76, format: ImageManipulator.SaveFormat.JPEG, base64: true });
+      if (!prepared.base64) throw new Error('The selected photo could not be prepared. Choose another image.');
+      const result = await BackendApi.uploadProfilePhoto(prepared.base64, 'image/jpeg');
+      setHasProfilePhoto(true);
+      setPhotoUpdatedAt(result.updatedAt);
+      setSaveStatus('Profile photo saved to your account');
+    } catch (error: any) {
+      Alert.alert('Photo upload failed', error?.message || 'Could not save this photo. Please try again.');
+    } finally { setPhotoLoading(false); }
+  };
+
+  const toggleBiometricLogin = async () => {
+    try {
+      if (biometricEnabled) {
+        await AuthService.disableBiometricLogin();
+        setBiometricEnabled(false);
+      } else {
+        await AuthService.enableBiometricLogin();
+        setBiometricEnabled(true);
+      }
+    } catch (error: any) {
+      Alert.alert('Biometric sign-in', error?.message || 'Could not update the device unlock option.');
+    }
+  };
+
   const handleSignOut = () => {
     Alert.alert(
       'Sign Out',
@@ -348,6 +399,17 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.photoCard}>
+          <ProfileAvatar userId={AuthService.getActiveUserId()} hasPhoto={hasProfilePhoto} photoUpdatedAt={photoUpdatedAt} emoji="🏃‍♂️" size={76} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.photoTitle}>Your profile photo</Text>
+            <Text style={styles.photoHint}>Stored privately with your AVFIT account.</Text>
+          </View>
+          <TouchableOpacity style={styles.photoButton} onPress={handlePickProfilePhoto} disabled={photoLoading}>
+            {photoLoading ? <ActivityIndicator color="#fff" size="small" /> : <><Camera size={16} color="#fff" /><Text style={styles.photoButtonText}>{hasProfilePhoto ? 'Change' : 'Upload'}</Text></>}
+          </TouchableOpacity>
+        </View>
+
         {/* Recalculated Caloric Target Pill */}
         <View style={styles.recalcBanner}>
           <Flame size={20} color={Colors.accentOrange} />
@@ -578,6 +640,15 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
           </View>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.biometricCard} onPress={toggleBiometricLogin} activeOpacity={0.8}>
+          <Shield size={20} color={Colors.primary} />
+          <View style={{ flex: 1, marginHorizontal: 10 }}>
+            <Text style={styles.privacyTitle}>Fingerprint / face sign-in</Text>
+            <Text style={styles.privacyDesc}>Unlock this device using its enrolled biometrics.</Text>
+          </View>
+          <View style={[styles.togglePill, biometricEnabled && styles.togglePillActive]}><View style={[styles.toggleThumb, biometricEnabled && styles.toggleThumbActive]} /></View>
+        </TouchableOpacity>
+
         {/* Sign Out Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut} activeOpacity={0.7}>
           <LogOut size={16} color={Colors.danger} />
@@ -623,17 +694,17 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   title: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
   subTitle: {
-    fontSize: 12,
+    fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 2,
   },
   saveStatus: {
-    fontSize: 10,
+    fontSize: 12,
     color: Colors.primary,
     fontWeight: '700',
     marginTop: 3,
@@ -653,6 +724,14 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
+  photoCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 15, borderRadius: 20,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 15,
+  },
+  photoTitle: { color: Colors.textPrimary, fontSize: 17, fontWeight: '900' },
+  photoHint: { color: Colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 3 },
+  photoButton: { minHeight: 44, paddingHorizontal: 13, borderRadius: 13, backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  photoButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   recalcBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -665,25 +744,25 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(36, 74, 50, 0.15)',
   },
   recalcTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
     color: Colors.primaryDark,
   },
   recalcSub: {
-    fontSize: 11,
+    fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
   },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 18,
+    padding: 20,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
     marginBottom: 16,
   },
   sectionHeading: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
     color: Colors.textPrimary,
     marginBottom: 12,
@@ -691,7 +770,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   label: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.textSecondary,
     marginBottom: 6,
@@ -702,8 +781,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    minHeight: 52,
+    paddingVertical: 13,
+    fontSize: 16,
     color: Colors.textPrimary,
     fontWeight: '600',
     marginBottom: 12,
@@ -776,6 +856,10 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 16,
     marginBottom: 16,
+  },
+  biometricCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 14,
+    borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.borderSubtle,
   },
   privacyTitle: {
     fontSize: 13,

@@ -51,6 +51,10 @@ export default function PhoneAuthScreen({ navigation, onCodeSent }: PhoneAuthScr
     }
 
     const fullPhone = `${selectedCountry.code}${cleaned}`;
+    if (authMode === 'login') {
+      navigation?.navigate?.('Login', { phone: fullPhone, countryCode: selectedCountry.code });
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -123,7 +127,9 @@ export default function PhoneAuthScreen({ navigation, onCodeSent }: PhoneAuthScr
             {authMode === 'signup' ? 'Start Your Fitness Journey' : 'Welcome Back'}
           </Text>
           <Text style={styles.subtitle}>
-            Enter your mobile number to receive a secure {OTP_CODE_LENGTH}-digit one-time verification code via SMS.
+            {authMode === 'signup'
+              ? `Verify your mobile number with a secure ${OTP_CODE_LENGTH}-digit SMS code to create your account.`
+              : 'Everyday sign-in uses your four-digit PIN. SMS is only for account recovery.'}
           </Text>
 
           {errorMessage && (
@@ -190,7 +196,9 @@ export default function PhoneAuthScreen({ navigation, onCodeSent }: PhoneAuthScr
           <View style={styles.consentBox}>
             <ShieldCheck size={16} color={Colors.primary} />
             <Text style={styles.consentText}>
-              By proceeding, you authorize AVFIT to send an SMS verification OTP. Standard carrier rates may apply. No passwords to remember.
+              {authMode === 'signup'
+                ? 'By proceeding, you authorize AVFIT to send an SMS verification code. Standard carrier rates may apply.'
+                : 'You will continue to the PIN sign-in screen. Use the SMS recovery option if you forgot or have not set a PIN.'}
             </Text>
           </View>
 
@@ -206,7 +214,7 @@ export default function PhoneAuthScreen({ navigation, onCodeSent }: PhoneAuthScr
             ) : (
               <>
                 <Text style={styles.submitButtonText}>
-                  {authMode === 'signup' ? 'Send Signup OTP' : 'Send Login OTP'}
+                  {authMode === 'signup' ? 'Send Signup OTP' : 'Continue to PIN sign-in'}
                 </Text>
                 <ArrowRight size={18} color="#FFFFFF" />
               </>

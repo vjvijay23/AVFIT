@@ -29,6 +29,7 @@ import {
   Navigation,
 } from 'lucide-react-native';
 import AvfitLogo from '../components/common/AvfitLogo';
+import ProfileAvatar from '../components/common/ProfileAvatar';
 import { AuthService } from '../services/auth';
 import { FitnessProfileService } from '../services/fitnessProfile';
 import { AchievementService } from '../services/achievements';
@@ -105,9 +106,7 @@ export default function DashboardScreen({ navigation }: any) {
           onPress={() => navigation?.navigate?.('ProfileEdit')}
           activeOpacity={0.8}
         >
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarEmoji}>{userProfile?.avatarUrl || '🏃‍♂️'}</Text>
-          </View>
+          <ProfileAvatar userId={userProfile?.id} hasPhoto={userProfile?.hasProfilePhoto} photoUpdatedAt={userProfile?.photoUpdatedAt} emoji={userProfile?.avatarUrl || '🏃‍♂️'} size={44} />
         </TouchableOpacity>
 
         {/* Official AVFIT Brand Logo Badge */}
@@ -204,7 +203,7 @@ export default function DashboardScreen({ navigation }: any) {
             </View>
           </View>
           <TouchableOpacity onPress={() => navigation?.navigate?.('DietPlan')} style={{ marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderSubtle }}>
-            <Text style={{ color: Colors.primary, fontSize: 13, fontWeight: '800' }}>Generate a personalized 7-day diet plan →</Text>
+            <Text style={{ color: Colors.primary, fontSize: 15, fontWeight: '800' }}>Open your personalized 7-day diet chart →</Text>
           </TouchableOpacity>
         </View>
 
@@ -389,13 +388,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   avatarContainer: {
-    width: 38,
-    height: 38,
+    width: 44,
+    height: 44,
   },
   avatarCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -436,13 +435,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   greetingTitle: {
-    fontSize: 24,
+    fontSize: 27,
     fontWeight: '900',
     color: Colors.textPrimary,
     letterSpacing: -0.3,
   },
   greetingSubtitle: {
-    fontSize: 12.5,
+    fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 2,
   },
@@ -516,12 +515,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroMetricValue: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '900',
     color: '#FFFFFF',
   },
   heroMetricLabel: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#8A968E',
     fontWeight: '700',
     marginTop: 2,
@@ -533,8 +532,8 @@ const styles = StyleSheet.create({
   },
   nutritionEngineCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 21,
+    padding: 18,
     borderWidth: 1,
     borderColor: '#E8DFC8',
     marginBottom: 14,
@@ -546,7 +545,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   engineTitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
@@ -556,7 +555,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   engineVal: {
-    fontSize: 20,
+    fontSize: 23,
     fontWeight: '900',
     color: Colors.primary,
   },

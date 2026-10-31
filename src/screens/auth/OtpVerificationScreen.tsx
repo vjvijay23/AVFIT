@@ -31,6 +31,7 @@ interface OtpVerificationScreenProps {
       countryCode?: string;
       authMode?: 'login' | 'signup';
       pendingProfile?: any;
+      forcePinReset?: boolean;
     };
   };
   navigation?: any;
@@ -49,6 +50,7 @@ export default function OtpVerificationScreen({
   const countryCode = route?.params?.countryCode || '+1';
   const authMode = route?.params?.authMode || 'signup';
   const pendingProfile = route?.params?.pendingProfile;
+  const forcePinReset = Boolean(route?.params?.forcePinReset);
 
   const [otpDigits, setOtpDigits] = useState(() => Array.from({ length: OTP_CODE_LENGTH }, () => ''));
   const [countdown, setCountdown] = useState(60);
@@ -122,11 +124,10 @@ export default function OtpVerificationScreen({
         if (onVerifiedSuccess) {
           onVerifiedSuccess(result.isNewUser);
         } else if (navigation?.replace) {
-          if (result.isNewUser || !result.user.isOnboarded) {
-            navigation.replace('FitnessOnboarding');
-          } else {
-            navigation.replace('Main');
-          }
+          const nextRoute = result.isNewUser || !result.user.isOnboarded ? 'FitnessOnboarding' : 'Main';
+          if (forcePinReset || result.isNewUser || !result.user.hasPin) {
+            navigation.replace('SetPin', { nextRoute });
+          } else navigation.replace(nextRoute);
         }
       }
     } catch (err: any) {

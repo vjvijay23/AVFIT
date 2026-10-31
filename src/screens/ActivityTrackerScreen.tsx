@@ -17,6 +17,7 @@ import {
   UserProfile,
 } from '../types';
 import { ActivityService } from '../services/activityService';
+import ProfileAvatar from '../components/common/ProfileAvatar';
 import { AuthService } from '../services/auth';
 import AvfitLogo from '../components/common/AvfitLogo';
 import {
@@ -91,7 +92,7 @@ export default function ActivityTrackerScreen({ navigation }: any) {
           onPress={() => navigation?.navigate?.('ProfileEdit')}
           activeOpacity={0.8}
         >
-          <Text style={styles.avatarEmoji}>{userProfile?.avatarUrl || '🏃‍♂️'}</Text>
+          <ProfileAvatar userId={userProfile?.id} hasPhoto={userProfile?.hasProfilePhoto} photoUpdatedAt={userProfile?.photoUpdatedAt} emoji={userProfile?.avatarUrl || '🏃‍♂️'} size={42} />
         </TouchableOpacity>
       </View>
 
@@ -163,8 +164,8 @@ export default function ActivityTrackerScreen({ navigation }: any) {
           {/* Quick Metrics HUD Preview */}
           <View style={styles.heroMetricsGrid}>
             <View style={styles.heroMetricBox}>
-              <Text style={styles.heroMetricLabel}>TARGET</Text>
-              <Text style={styles.heroMetricValue}>Open Run</Text>
+              <Text style={styles.heroMetricLabel}>ACTIVITY</Text>
+              <Text style={styles.heroMetricValue}>{activeSportConfig.label}</Text>
             </View>
             <View style={styles.heroMetricDivider} />
             <View style={styles.heroMetricBox}>
@@ -337,9 +338,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   profileBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -362,13 +363,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   pageTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '900',
     color: Colors.textPrimary,
     letterSpacing: -0.5,
   },
   pageSubtitle: {
-    fontSize: 13,
+    fontSize: 15,
     color: Colors.textSecondary,
     marginTop: 3,
     lineHeight: 18,
@@ -470,13 +471,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroMetricLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontWeight: '800',
     color: '#8A968E',
     letterSpacing: 0.6,
   },
   heroMetricValue: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
     marginTop: 3,
@@ -553,12 +554,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   summaryMetricNumber: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '900',
     color: Colors.textPrimary,
   },
   summaryMetricUnit: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.textSecondary,
     fontWeight: '600',
     marginTop: 1,

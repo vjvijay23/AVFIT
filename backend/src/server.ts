@@ -53,6 +53,11 @@ export async function buildApp() {
           description: 'Local Development Server',
         },
       ],
+      components: {
+        securitySchemes: {
+          bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        },
+      },
     },
   });
 

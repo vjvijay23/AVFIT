@@ -23,6 +23,7 @@ import CommunityScreen from '../screens/CommunityScreen';
 import AuthWelcomeScreen from '../screens/auth/AuthWelcomeScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
+import SetPinScreen from '../screens/auth/SetPinScreen';
 import PhoneAuthScreen from '../screens/auth/PhoneAuthScreen';
 import OtpVerificationScreen from '../screens/auth/OtpVerificationScreen';
 import FitnessOnboardingScreen from '../screens/onboarding/FitnessOnboardingScreen';
@@ -140,6 +141,7 @@ export default function RootNavigator({ initialRouteName = 'AuthWelcome' }: { in
       <Stack.Screen name="AuthWelcome" component={AuthWelcomeScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="SetPin" component={SetPinScreen} />
 
       {/* Phone Auth & OTP Verification */}
       <Stack.Screen name="PhoneAuth" component={PhoneAuthScreen} />

@@ -12,6 +12,7 @@ export interface AuthUser {
   isPhoneVerified: boolean;
   isOnboarded: boolean;
   createdAt: string;
+  hasPin?: boolean;
 }
 
 export interface PhoneAuthRequest {
@@ -45,6 +46,8 @@ export interface UserProfile {
   totalPoints: number;
   createdAt: string;
   updatedAt: string;
+  hasProfilePhoto?: boolean;
+  photoUpdatedAt?: string;
 }
 
 // --------------------------------------------------------------------

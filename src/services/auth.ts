@@ -3,6 +3,9 @@ import { UserStore } from './userStore';
 import { BackendApi } from './backendApi';
 import * as Msg91Otp from './msg91Otp';
 import { OTP_CODE_LENGTH } from './otpConfig';
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 export interface PendingSignupData {
   fullName: string;
@@ -16,11 +19,86 @@ export interface PendingSignupData {
 
 // Active session holder in memory (null by default so new sessions do not inherit another user's data)
 let currentActiveUserId: string | null = null;
+const BIOMETRIC_LOGIN_KEY = 'avfit.biometric-login-enabled';
 
 export const AuthService = {
   async restoreSession(): Promise<boolean> {
     const userId = await BackendApi.restoreAuthSession();
     if (!userId) return false;
+    const biometricEnabled = await this.isBiometricLoginEnabled();
+    if (biometricEnabled && Platform.OS !== 'web') {
+      try {
+        const [hardware, enrolled] = await Promise.all([
+          LocalAuthentication.hasHardwareAsync(),
+          LocalAuthentication.isEnrolledAsync(),
+        ]);
+        if (!hardware || !enrolled) {
+          await SecureStore.deleteItemAsync(BIOMETRIC_LOGIN_KEY);
+        } else {
+          const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: 'Unlock AVFIT',
+            cancelLabel: 'Use PIN',
+            disableDeviceFallback: true,
+          });
+          if (!result.success) {
+            BackendApi.clearAuthToken();
+            return false;
+          }
+        }
+      } catch {
+        BackendApi.clearAuthToken();
+        return false;
+      }
+    }
+    currentActiveUserId = userId;
+    return true;
+  },
+  async signInWithPin(phone: string, pin: string): Promise<UserProfile> {
+    const result = await BackendApi.loginWithPin(phone, pin);
+    currentActiveUserId = String(result.user.id);
+    return this.getUserProfile(currentActiveUserId);
+  },
+  async isBiometricLoginEnabled(): Promise<boolean> {
+    if (Platform.OS === 'web') return false;
+    try { return (await SecureStore.getItemAsync(BIOMETRIC_LOGIN_KEY)) === 'true'; }
+    catch { return false; }
+  },
+  async enableBiometricLogin(): Promise<void> {
+    if (Platform.OS === 'web') throw new Error('Device biometrics are available in the Android and iOS app only.');
+    const [hardware, enrolled] = await Promise.all([
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync(),
+    ]);
+    if (!hardware || !enrolled) throw new Error('Set up a fingerprint or face unlock in your device settings first.');
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Confirm biometrics for AVFIT sign-in',
+      cancelLabel: 'Cancel',
+      disableDeviceFallback: true,
+    });
+    if (!result.success) throw new Error('Biometric confirmation was not completed.');
+    await SecureStore.setItemAsync(BIOMETRIC_LOGIN_KEY, 'true');
+  },
+  async disableBiometricLogin(): Promise<void> {
+    if (Platform.OS !== 'web') await SecureStore.deleteItemAsync(BIOMETRIC_LOGIN_KEY);
+  },
+  async signInWithBiometrics(): Promise<boolean> {
+    if (Platform.OS === 'web' || !(await this.isBiometricLoginEnabled())) return false;
+    const userId = await BackendApi.restoreAuthSession();
+    if (!userId) return false;
+    const [hardware, enrolled] = await Promise.all([
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync(),
+    ]);
+    if (!hardware || !enrolled) { BackendApi.clearAuthToken(); return false; }
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Unlock AVFIT',
+      cancelLabel: 'Use PIN',
+      disableDeviceFallback: true,
+    });
+    if (!result.success) {
+      BackendApi.clearAuthToken();
+      return false;
+    }
     currentActiveUserId = userId;
     return true;
   },
@@ -100,6 +178,7 @@ export const AuthService = {
       isPhoneVerified: true,
       isOnboarded: normalizedProfile.isOnboarded,
       createdAt: normalizedProfile.createdAt,
+      hasPin: Boolean(response.user.hasPin),
     };
 
     return {
@@ -148,14 +227,16 @@ export const AuthService = {
       const row = result.profile;
       profile = {
         ...(profile || {} as UserProfile),
-        id: String(row.id), phone: row.phone || '', fullName: row.full_name || profile?.fullName || '',
-        avatarUrl: row.avatar_url || undefined, dateOfBirth: row.date_of_birth || undefined,
-        age: ageFromDateOfBirth(row.date_of_birth) || profile?.age,
+        id: String(row.id), phone: row.phone || '', fullName: row.fullName || row.full_name || profile?.fullName || '',
+        avatarUrl: row.avatarUrl || row.avatar_url || undefined, dateOfBirth: row.dateOfBirth || row.date_of_birth || undefined,
+        age: ageFromDateOfBirth(row.dateOfBirth || row.date_of_birth) || profile?.age,
         gender: row.gender || undefined, country: row.country || '',
-        preferredUnits: row.preferred_units || 'metric', isOnboarded: Boolean(row.is_onboarded),
-        streakCount: Number(row.streak_count || 0), totalPoints: Number(row.total_trophy_points || 0),
-        createdAt: row.created_at || profile?.createdAt || new Date().toISOString(),
-        updatedAt: row.updated_at || new Date().toISOString(),
+        preferredUnits: row.preferredUnits || row.preferred_units || 'metric', isOnboarded: Boolean(row.isOnboarded ?? row.is_onboarded),
+        streakCount: Number(row.streakCount ?? row.streak_count ?? 0), totalPoints: Number(row.totalPoints ?? row.total_trophy_points ?? 0),
+        hasProfilePhoto: Boolean(row.hasProfilePhoto ?? row.has_profile_photo),
+        photoUpdatedAt: row.photoUpdatedAt ? new Date(row.photoUpdatedAt).toISOString() : row.photo_updated_at ? new Date(row.photo_updated_at).toISOString() : undefined,
+        createdAt: row.createdAt || row.created_at || profile?.createdAt || new Date().toISOString(),
+        updatedAt: row.updatedAt || row.updated_at || new Date().toISOString(),
       };
       UserStore.saveProfile(profile);
     }
@@ -202,6 +283,7 @@ export const AuthService = {
   async signOut(): Promise<void> {
     currentActiveUserId = null;
     await BackendApi.signOut();
+    if (Platform.OS !== 'web') await SecureStore.deleteItemAsync(BIOMETRIC_LOGIN_KEY).catch(() => undefined);
   },
 };
 
