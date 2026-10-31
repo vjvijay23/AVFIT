@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
@@ -29,8 +30,7 @@ import { AuthService } from '../../services/auth';
 import { BackendApi } from '../../services/backendApi';
 import DateOfBirthPicker from '../../components/common/DateOfBirthPicker';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
-import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
+import { launchImageLibrary } from 'react-native-image-picker';
 import {
   User,
   Shield,
@@ -80,6 +80,10 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
   const [photoUpdatedAt, setPhotoUpdatedAt] = useState<string>();
   const [photoLoading, setPhotoLoading] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [showBiometricSetup, setShowBiometricSetup] = useState(false);
+  const [biometricPin, setBiometricPin] = useState('');
+  const [biometricSaving, setBiometricSaving] = useState(false);
+  const [biometricError, setBiometricError] = useState('');
 
   // Form states
   const [fullName, setFullName] = useState('');
@@ -297,22 +301,15 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
 
   const handlePickProfilePhoto = async () => {
     if (!BackendApi.hasAuthToken()) { Alert.alert('Sign in required', 'Sign in again to save a profile photo.'); return; }
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permission.status !== 'granted') { Alert.alert('Photo permission', 'Allow AVFIT to access your photo library to choose a profile photo.'); return; }
-    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 1 });
-    if (picked.canceled || !picked.assets[0]) return;
+    const picked = await launchImageLibrary({
+      mediaType: 'photo', selectionLimit: 1, includeBase64: true,
+      maxWidth: 512, maxHeight: 512, quality: 0.7,
+    });
+    if (picked.didCancel || picked.errorCode || !picked.assets?.[0]?.base64) return;
     setPhotoLoading(true);
     try {
       const asset = picked.assets[0];
-      const side = Math.min(asset.width || 512, asset.height || 512);
-      const originX = Math.floor(((asset.width || side) - side) / 2);
-      const originY = Math.floor(((asset.height || side) - side) / 2);
-      const prepared = await ImageManipulator.manipulateAsync(asset.uri, [
-        { crop: { originX, originY, width: side, height: side } },
-        { resize: { width: 512, height: 512 } },
-      ], { compress: 0.76, format: ImageManipulator.SaveFormat.JPEG, base64: true });
-      if (!prepared.base64) throw new Error('The selected photo could not be prepared. Choose another image.');
-      const result = await BackendApi.uploadProfilePhoto(prepared.base64, 'image/jpeg');
+      const result = await BackendApi.uploadProfilePhoto(asset.base64!, asset.type || 'image/jpeg');
       setHasProfilePhoto(true);
       setPhotoUpdatedAt(result.updatedAt);
       setSaveStatus('Profile photo saved to your account');
@@ -327,12 +324,28 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
         await AuthService.disableBiometricLogin();
         setBiometricEnabled(false);
       } else {
-        await AuthService.enableBiometricLogin();
-        setBiometricEnabled(true);
+        setBiometricPin('');
+        setBiometricError('');
+        setShowBiometricSetup(true);
       }
     } catch (error: any) {
       Alert.alert('Biometric sign-in', error?.message || 'Could not update the device unlock option.');
     }
+  };
+
+  const confirmBiometricSetup = async () => {
+    if (!/^\d{4}$/.test(biometricPin)) { setBiometricError('Enter your current four-digit PIN.'); return; }
+    setBiometricSaving(true);
+    setBiometricError('');
+    try {
+      await AuthService.enableBiometricLogin(phone, biometricPin);
+      setBiometricEnabled(true);
+      setShowBiometricSetup(false);
+      setBiometricPin('');
+      setSaveStatus('Fingerprint / face sign-in is ready on this device');
+    } catch (error: any) {
+      setBiometricError(error?.message || 'Could not enable biometric sign-in. Check your PIN and try again.');
+    } finally { setBiometricSaving(false); }
   };
 
   const handleSignOut = () => {
@@ -655,6 +668,23 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
           <Text style={styles.logoutText}>Sign Out of AVFIT</Text>
         </TouchableOpacity>
       </ScrollView>
+      <Modal visible={showBiometricSetup} transparent animationType="fade" onRequestClose={() => setShowBiometricSetup(false)}>
+        <View style={styles.biometricModalBackdrop}>
+          <View style={styles.biometricModalCard}>
+            <View style={styles.biometricModalIcon}><Shield size={24} color={Colors.primary} /></View>
+            <Text style={styles.biometricModalTitle}>Enable device sign-in</Text>
+            <Text style={styles.biometricModalBody}>Confirm your AVFIT PIN once. Your phone and PIN will be saved in this device’s biometric-protected keychain.</Text>
+            {!!biometricError && <Text style={styles.biometricError}>{biometricError}</Text>}
+            <TextInput value={biometricPin} onChangeText={(value) => { setBiometricPin(value.replace(/\D/g, '').slice(0, 4)); setBiometricError(''); }} keyboardType="number-pad" secureTextEntry maxLength={4} style={styles.biometricPinInput} placeholder="4-digit PIN" placeholderTextColor={Colors.textMuted} accessibilityLabel="Current four-digit PIN for biometric setup" />
+            <View style={styles.biometricModalActions}>
+              <TouchableOpacity style={styles.biometricCancelButton} onPress={() => setShowBiometricSetup(false)} disabled={biometricSaving}><Text style={styles.biometricCancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.biometricConfirmButton} onPress={confirmBiometricSetup} disabled={biometricSaving}>
+                {biometricSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.biometricConfirmText}>Enable</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -861,6 +891,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 14,
     borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.borderSubtle,
   },
+  biometricModalBackdrop: { flex: 1, backgroundColor: 'rgba(16, 24, 18, 0.48)', justifyContent: 'center', padding: 22 },
+  biometricModalCard: { backgroundColor: Colors.surface, borderRadius: 24, borderWidth: 1, borderColor: Colors.borderSubtle, padding: 22 },
+  biometricModalIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 13 },
+  biometricModalTitle: { color: Colors.textPrimary, fontSize: 21, fontWeight: '900' },
+  biometricModalBody: { color: Colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: 7, marginBottom: 14 },
+  biometricError: { color: Colors.danger, backgroundColor: '#FCE7E5', padding: 11, borderRadius: 12, fontSize: 14, lineHeight: 19, fontWeight: '700', marginBottom: 10 },
+  biometricPinInput: { height: 58, borderRadius: 15, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.backgroundLight, color: Colors.textPrimary, textAlign: 'center', fontSize: 22, fontWeight: '800', letterSpacing: 8 },
+  biometricModalActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  biometricCancelButton: { flex: 1, height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surfaceWarm },
+  biometricCancelText: { color: Colors.textPrimary, fontSize: 15, fontWeight: '800' },
+  biometricConfirmButton: { flex: 1, height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary },
+  biometricConfirmText: { color: '#fff', fontSize: 15, fontWeight: '900' },
   privacyTitle: {
     fontSize: 13,
     fontWeight: '700',

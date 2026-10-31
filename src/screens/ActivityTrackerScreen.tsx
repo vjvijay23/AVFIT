@@ -20,6 +20,7 @@ import { ActivityService } from '../services/activityService';
 import ProfileAvatar from '../components/common/ProfileAvatar';
 import { AuthService } from '../services/auth';
 import AvfitLogo from '../components/common/AvfitLogo';
+import AppNoticeCard from '../components/common/AppNoticeCard';
 import {
   Navigation,
   Play,
@@ -47,20 +48,32 @@ export default function ActivityTrackerScreen({ navigation }: any) {
   const [userStats, setUserStats] = useState<UserFitnessStats | null>(null);
   const [activities, setActivities] = useState<RecordedActivity[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadData = async () => {
-    const stats = await ActivityService.getUserStats();
-    const list = await ActivityService.getUserActivities();
-    const profile = await AuthService.getUserProfile();
-    setUserStats(stats);
-    setActivities(list);
-    setUserProfile(profile);
+    try {
+      const [statsResult, listResult, profileResult] = await Promise.allSettled([
+        ActivityService.getUserStats(),
+        ActivityService.getUserActivities(),
+        AuthService.getUserProfile(),
+      ]);
+      if (statsResult.status === 'fulfilled') setUserStats(statsResult.value);
+      if (listResult.status === 'fulfilled') setActivities(listResult.value);
+      if (profileResult.status === 'fulfilled') setUserProfile(profileResult.value);
+      const failed = [statsResult, listResult, profileResult].some((result) => result.status === 'rejected');
+      setLoadError(failed ? 'Some activity history is temporarily unavailable. You can still start a new activity.' : null);
+    } catch (error) {
+      // Keep the tracker screen and its start action available even if history or
+      // dashboard data is temporarily unreachable.
+      console.warn('[ActivityTracker] Could not refresh activity history', error);
+      setLoadError('Activity history is temporarily unavailable. You can still start a new activity.');
+    }
   };
 
   useEffect(() => {
-    loadData();
+    void loadData();
     const unsubscribe = navigation?.addListener?.('focus', () => {
-      loadData();
+      void loadData();
     });
     return unsubscribe;
   }, [navigation]);
@@ -103,6 +116,8 @@ export default function ActivityTrackerScreen({ navigation }: any) {
           { paddingBottom: 130 + insets.bottom },
         ]}
       >
+        {loadError && <AppNoticeCard message={loadError} tone="warning" compact />}
+
         {/* Title & Introduction */}
         <View style={styles.titleSection}>
           <Text style={styles.pageTitle}>Record & Track</Text>
@@ -430,7 +445,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   heroSportSub: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#A0ABA4',
     marginTop: 1,
   },
@@ -452,7 +467,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   gpsStatusText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.2,
@@ -471,13 +486,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroMetricLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     color: '#8A968E',
     letterSpacing: 0.6,
   },
   heroMetricValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
     marginTop: 3,
@@ -530,7 +545,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   summaryTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
@@ -554,12 +569,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   summaryMetricNumber: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
     color: Colors.textPrimary,
   },
   summaryMetricUnit: {
-    fontSize: 12,
+    fontSize: 13,
     color: Colors.textSecondary,
     fontWeight: '600',
     marginTop: 1,
@@ -584,7 +599,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   historyCountText: {
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontWeight: '700',
     color: Colors.textSecondary,
   },
@@ -613,7 +628,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   emptyStateSubtitle: {
-    fontSize: 12.5,
+    fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 4,
@@ -648,7 +663,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   activityMetaText: {
-    fontSize: 11.5,
+    fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
   },
@@ -661,7 +676,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   activityPaceText: {
-    fontSize: 11,
+    fontSize: 12.5,
     color: Colors.textSecondary,
     marginTop: 1,
   },
@@ -702,12 +717,12 @@ const styles = StyleSheet.create({
   },
   stravaEngineBadgeText: {
     color: '#FC5200',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
   walkingAnalyzerSub: {
-    fontSize: 11,
+    fontSize: 12.5,
     color: Colors.textSecondary,
     marginTop: 2,
   },

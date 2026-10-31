@@ -213,7 +213,7 @@ class WalkingForegroundServiceManager {
         }
 
         // Sleep to avoid pegging CPU while preserving screen-off operation
-        await new Promise((r) => setTimeout(r, sleepInterval));
+        await new Promise<void>((resolve) => setTimeout(resolve, sleepInterval));
       }
       resolve();
     });

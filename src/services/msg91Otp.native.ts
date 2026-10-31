@@ -1,4 +1,5 @@
 import { getMsg91AccessToken } from './msg91AccessToken';
+import Config from 'react-native-config';
 
 declare const require: (moduleName: string) => unknown;
 const { OTPWidget } = require('@msg91comm/sendotp-react-native') as {
@@ -10,8 +11,8 @@ const { OTPWidget } = require('@msg91comm/sendotp-react-native') as {
   };
 };
 
-const widgetId = process.env.EXPO_PUBLIC_MSG91_MOBILE_WIDGET_ID || process.env.EXPO_PUBLIC_MSG91_WIDGET_ID || '';
-const tokenAuth = process.env.EXPO_PUBLIC_MSG91_MOBILE_TOKEN_AUTH || process.env.EXPO_PUBLIC_MSG91_TOKEN_AUTH || '';
+const widgetId = Config.AVFIT_MSG91_MOBILE_WIDGET_ID || Config.AVFIT_MSG91_WIDGET_ID || '';
+const tokenAuth = Config.AVFIT_MSG91_MOBILE_TOKEN_AUTH || Config.AVFIT_MSG91_TOKEN_AUTH || '';
 const requestIds = new Map<string, string>();
 let initialized = false;
 const MSG91_OPERATION_TIMEOUT_MS = 20000;
@@ -32,7 +33,7 @@ async function withOperationTimeout<T>(operation: Promise<T>): Promise<T> {
 
 function configureWidget() {
   if (!widgetId || !tokenAuth) {
-    throw new Error('MSG91 mobile OTP is not configured in this build. Set EXPO_PUBLIC_MSG91_WIDGET_ID and EXPO_PUBLIC_MSG91_TOKEN_AUTH, then rebuild the app.');
+    throw new Error('MSG91 mobile OTP is not configured in this build. Set AVFIT_MSG91_WIDGET_ID and AVFIT_MSG91_TOKEN_AUTH in .env, then rebuild the app.');
   }
   if (!initialized) {
     OTPWidget.initializeWidget(widgetId, tokenAuth);

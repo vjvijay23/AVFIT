@@ -1,6 +1,8 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+project.ext.envConfigFiles = [debug: ".env", release: ".env"]
+apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -35,10 +37,8 @@ react {
     hermesCommand = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/sdks/hermesc/%OS-BIN%/hermesc"
     codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
 
-    // Use Expo CLI to bundle the app, this ensures the Metro config
-    // works correctly with Expo projects.
-    cliFile = new File(["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim())
-    bundleCommand = "export:embed"
+    cliFile = new File(["node", "--print", "require.resolve('react-native/cli')"].execute(null, rootDir).text.trim())
+    bundleCommand = "bundle"
 
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '..'
@@ -83,6 +83,7 @@ react {
         /* Autolinking */
         autolinkLibrariesWithApp()
     }
+    // Values are read from .env by react-native-config's Gradle integration.
 }
 
 /**
@@ -114,8 +115,9 @@ android {
         applicationId 'com.avfit.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 14
-        versionName "1.1.2"
+        versionCode 18
+        versionName "1.1.6"
+        manifestPlaceholders = [googleMapsApiKey: project.env.get("AVFIT_GOOGLE_MAPS_API_KEY", "")]
     }
     signingConfigs {
         debug {
@@ -141,7 +143,7 @@ android {
     }
     packagingOptions {
         jniLibs {
-            useLegacyPackaging (findProperty('expo.useLegacyPackaging')?.toBoolean() ?: false)
+            useLegacyPackaging false
         }
     }
 }
@@ -170,9 +172,9 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
-    def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
-    def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
-    def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true";
+    def isGifEnabled = true
+    def isWebpEnabled = true
+    def isWebpAnimatedEnabled = false
 
     if (isGifEnabled) {
         // For animated gif support

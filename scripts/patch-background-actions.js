@@ -33,7 +33,7 @@ const api35Timeout = [
 ].join('\n');
 
 if (source.includes(api35Timeout)) {
-  // Expo SDK 51 compiles against API 34. Keep its supported timeout callback;
+  // The Android project compiles against API 34. Keep the supported timeout callback;
   // the two-argument overload is only available when compiling against API 35+.
   fs.writeFileSync(sourcePath, source.replace(api35Timeout, ''), 'utf8');
 }

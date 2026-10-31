@@ -1,8 +1,8 @@
 # 2-Developer Agile Roadmap & MVP Execution Plan
 
 **Team Composition:** 2 Full-Stack Mobile Engineers  
-**Target Delivery:** 6 Weeks to Working Alpha on Android (Expo Go)  
-**Budget:** \$0 Operational Spend (Free Tiers: Expo, Supabase, Gemini API)  
+**Target Delivery:** 6 Weeks to Working Alpha on Android (installable APK)  
+**Budget:** \$0 Operational Spend (Free Tiers: Supabase, Gemini API)  
 
 ---
 
@@ -12,7 +12,7 @@
 |---|---|---|
 | **Primary Domain** | React Native UI, Animations, Sensors, Navigation | Supabase DB, Gemini AI Vision, State & Auth |
 | **Pillar 1 (Dashboard)** | Circular SVG rings, Macro bar, Layouts | Metric aggregation queries, Streak algorithm |
-| **Pillar 2 (Steps)** | `expo-sensors` Pedometer listener & UI | Supabase sync queue, Weekly leaderboard views |
+| **Pillar 2 (Steps)** | Native Android sensor listener & UI | Supabase sync queue, Weekly leaderboard views |
 | **Pillar 3 (AI Food)** | Camera viewfinder, Photo picker, Adjustment UI | Gemini API integration, JSON parser, Food DB |
 | **Pillar 4 (Workouts)** | Workout player, Rest countdown timer, Audio | Workout catalog data, Completion logging |
 | **Pillar 5 (Community)**| Social feed layout, Like animations, Post modal | Supabase Realtime feed, Likes/Comments tables |
@@ -51,19 +51,19 @@ gantt
 
 ### Sprint 1 (Week 1): Foundation & Architecture
 - **Deliverables:**
-  - Setup React Native Expo project with TypeScript, React Navigation, and Lucide icons.
+  - Set up a bare React Native project with TypeScript, React Navigation, and Lucide icons.
   - Setup Supabase instance, execute `DATABASE_SCHEMA.sql`, configure Auth.
   - Establish color theme tokens, reusable Cards, Buttons, and Header components.
 
 ### Sprint 2 (Week 2): Unified Dashboard & Step Tracking
 - **Deliverables:**
   - Build `DashboardScreen` with interactive rings for steps, calories, and macros.
-  - Connect `expo-sensors` Pedometer to track live physical steps on Android.
+  - Connect native Android sensors to track live physical steps.
   - Implement BMR/TDEE formula for personalized calorie targets.
 
 ### Sprint 3 (Week 3): AI Food Scanner & Nutrition Calculator
 - **Deliverables:**
-  - Build `FoodScannerScreen` with `expo-camera`.
+  - Build `FoodScannerScreen` with native camera and image picker modules.
   - Connect Gemini 1.5 Flash multimodal vision API.
   - Implement the portion adjustment slider and save to Supabase `meals` table.
 
@@ -81,7 +81,7 @@ gantt
 
 ### Sprint 6 (Week 6): Real-User Testing & Android Deployment
 - **Deliverables:**
-  - Test on 10+ real beta users using Expo Go on Android.
+  - Test on 10+ real beta users with installable Android APKs.
   - Validate AI nutrition scanning accuracy across varied meals.
   - Ensure zero battery drain from pedometer background listeners.
   - Prepare Google Play Store listing assets.

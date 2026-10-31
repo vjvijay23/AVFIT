@@ -1,7 +1,7 @@
 # AVFIT - All-in-One Fitness & Community Platform
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20(React%20Native%20%2F%20Expo)-green.svg)](https://expo.dev)
+[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20(React%20Native)-green.svg)](https://reactnative.dev)
 [![Backend](https://img.shields.io/badge/Backend-Supabase%20(PostgreSQL%20%2B%20Auth)-emerald.svg)](https://supabase.com)
 [![AI Engine](https://img.shields.io/badge/AI-Google%20Gemini%20Vision%20(Free%20Tier)-orange.svg)](https://ai.google.dev)
 
@@ -22,7 +22,7 @@
 
 ```mermaid
 graph TD
-    Client["AVFIT Mobile App (React Native / Expo)"]
+    Client["AVFIT Mobile App (Bare React Native)"]
     
     subgraph Core Features
         D["Unified Dashboard"]
@@ -93,11 +93,11 @@ graph TD
 
 | Layer | Technology | Free Tier Advantage |
 |---|---|---|
-| **Mobile Client** | **React Native + Expo (TypeScript)** | 1 codebase for Android & iOS; instant test via Expo Go on physical phones without Mac. |
+| **Mobile Client** | **Bare React Native (TypeScript)** | Native Android application packaged as an installable APK. |
 | **Styling & UI** | **NativeWind (Tailwind CSS) + Lucide Icons** | Fast rapid prototyping; consistent design tokens across screens. |
 | **Backend & DB** | **Supabase (PostgreSQL)** | Free Tier: 50,000 MAU auth, 500MB database, 1GB storage, built-in Row-Level Security. |
 | **AI Food Vision** | **Google Gemini 1.5 Flash API** | Generous free quota (15 RPM), structured JSON outputs for instant food & macro parsing. |
-| **Activity Tracking** | `expo-sensors` (Pedometer) + Android Health Connect | Local sensor tracking with zero API costs. |
+| **Activity Tracking** | Native React Native location and foreground-service modules | GPS routes and workout tracking on Android. |
 
 ---
 
@@ -126,7 +126,7 @@ graph TD
 │   ├── hooks/                     # Custom hooks (useSteps, useNutrition, useAuth)
 │   ├── types/                     # TypeScript definitions
 │   └── utils/                     # Macro calculators, formatters, storage helpers
-├── app.json                       # Expo configuration
+├── android/                       # Native Android application project
 ├── package.json                   # Dependencies and scripts
 └── tsconfig.json                  # TypeScript configuration
 ```
@@ -145,7 +145,8 @@ We have built an interactive HTML/Tailwind wireframe visualizer that showcases b
 ### Prerequisites
 - Node.js (v18 or higher recommended)
 - Git
-- Expo Go App on your Android phone ([Google Play Store](https://play.google.com/store/apps/details?id=host.exp.exponent))
+- Android Studio or Android SDK command-line tools
+- Java 17 and an Android phone with USB debugging enabled for device installs
 
 ### Installation
 ```bash
@@ -160,11 +161,11 @@ npm install
 cp .env.example .env
 # Fill in your free Supabase URL and Google Gemini API Key
 
-# 4. Start Expo development server
-npx expo start
+# 4. Start the React Native Metro bundler (for a connected debug device)
+npm start
 ```
 
-Scan the QR code with your phone camera or the Expo Go app to launch the app instantly on your Android device!
+To build a standalone release APK for device testing, run `npm run android:apk`. The APK is written to `android/app/build/outputs/apk/release/app-release.apk`. Install it with `adb install -r android/app/build/outputs/apk/release/app-release.apk`.
 
 ---
 

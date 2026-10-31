@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, CheckCircle2, Flame, Sparkles, Utensils } from 'lucide-react-native';
 import { BackendApi } from '../services/backendApi';
 import { Colors } from '../theme/colors';
+import AppNoticeCard from '../components/common/AppNoticeCard';
 
 type Meal = { name: string; portion: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; fiber_g: number };
 type DietDay = { day: string; meals: Meal[]; daily_totals: Record<string, number> };
@@ -62,7 +63,7 @@ export default function DietPlanScreen({ navigation }: any) {
           </> : <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('Login')}><Text style={styles.primaryButtonText}>Sign in to personalize your chart</Text></TouchableOpacity>}
         </View>
 
-        {!!notice && <View style={styles.noticeCard}><CheckCircle2 color={Colors.accentOrange} size={19} /><Text style={styles.noticeText}>{notice}</Text></View>}
+        {!!notice && <AppNoticeCard message={notice} tone="warning" compact />}
         {loading && <View style={styles.loadingCard}><ActivityIndicator color={Colors.primary} /><Text style={styles.helpText}>Loading your saved chart…</Text></View>}
         {!loading && !plan && <View style={styles.emptyCard}><View style={styles.emptyIcon}><Utensils size={23} color={Colors.primary} /></View><Text style={styles.emptyTitle}>A clear plan for the whole week</Text><Text style={styles.helpText}>Get meal ideas with portions, calories and macros for each day. Your chart is saved to your AVFIT account.</Text></View>}
 
@@ -138,8 +139,6 @@ const styles = StyleSheet.create({
   primaryButton: { minHeight: 56, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9, backgroundColor: Colors.primary, borderRadius: 16, marginTop: 13, paddingHorizontal: 16 },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
   buttonDisabled: { opacity: 0.7 },
-  noticeCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: Colors.accentSoft, borderColor: '#F4D4C9', borderWidth: 1, padding: 14, borderRadius: 16, marginBottom: 13 },
-  noticeText: { flex: 1, color: Colors.textPrimary, fontSize: 14, lineHeight: 20, fontWeight: '600' },
   loadingCard: { alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 20, padding: 24 },
   helpText: { color: Colors.textSecondary, fontSize: 15, lineHeight: 22 },
   emptyCard: { alignItems: 'center', backgroundColor: '#fff', padding: 24, borderRadius: 22, borderWidth: 1, borderColor: Colors.borderSubtle, marginTop: 2 },
@@ -168,7 +167,7 @@ const styles = StyleSheet.create({
   dayChipKcalActive: { color: '#EAF3ED' },
   dayCard: { backgroundColor: '#fff', borderRadius: 23, padding: 17, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 14 },
   dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  dayEyebrow: { fontSize: 10, letterSpacing: 0.8, color: Colors.textMuted, fontWeight: '900' },
+  dayEyebrow: { fontSize: 11, letterSpacing: 0.8, color: Colors.textMuted, fontWeight: '900' },
   dayTitle: { color: Colors.textPrimary, fontSize: 22, fontWeight: '900', marginTop: 2 },
   dayKcalBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: Colors.accentSoft, borderRadius: 13 },
   dayKcalText: { color: Colors.primary, fontSize: 14, fontWeight: '900' },
@@ -176,13 +175,13 @@ const styles = StyleSheet.create({
   macroItem: { alignItems: 'center', flex: 1 },
   macroDot: { width: 7, height: 7, borderRadius: 4, marginBottom: 5 },
   macroValue: { color: Colors.textPrimary, fontSize: 15, fontWeight: '900' },
-  macroLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  macroLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 2 },
   mealRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth, borderColor: Colors.borderSubtle },
   mealIndex: { width: 31, height: 31, borderRadius: 11, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   mealIndexText: { color: Colors.primary, fontSize: 13, fontWeight: '900' },
   mealName: { color: Colors.textPrimary, fontSize: 16, fontWeight: '800' },
   mealPortion: { color: Colors.textSecondary, fontSize: 13, marginTop: 3 },
-  mealMacros: { color: Colors.textMuted, fontSize: 11, marginTop: 5 },
+  mealMacros: { color: Colors.textMuted, fontSize: 12, marginTop: 5 },
   mealCalories: { color: Colors.primary, fontSize: 13, fontWeight: '900' },
   notesCard: { backgroundColor: '#fff', borderRadius: 21, padding: 17, borderWidth: 1, borderColor: Colors.borderSubtle, gap: 10 },
   noteRow: { flexDirection: 'row', gap: 9, alignItems: 'flex-start' },

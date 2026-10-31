@@ -401,7 +401,7 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="cover-body">
       <div style="display: flex; gap: 6px; margin-bottom: 12px;">
-        <span class="badge badge-gold">Expo SDK 51</span>
+        <span class="badge badge-gold">Bare React Native</span>
         <span class="badge badge-cyan">Google Gemini 1.5 Flash</span>
         <span class="badge badge-green">Supabase PostgreSQL</span>
         <span class="badge badge-orange">Mifflin-St Jeor Engine</span>
@@ -544,14 +544,14 @@ const htmlContent = `<!DOCTYPE html>
 
   <h2>2.1 High-Level Component Topology</h2>
   <p>
-    The AVFIT platform adopts a <strong>Client-Edge-Cloud Hybrid Architecture</strong>. The presentation layer runs natively on the mobile client (React Native / Expo SDK 51), communicating securely via HTTPS/WebSockets with Supabase Serverless Cloud (PostgreSQL 15 with Row-Level Security) and the Google Gemini 1.5 Flash Vision Multimodal AI inference endpoint.
+    The AVFIT platform adopts a <strong>Client-Edge-Cloud Hybrid Architecture</strong>. The presentation layer runs natively on the mobile client (bare React Native), communicating securely via HTTPS/WebSockets with Supabase Serverless Cloud (PostgreSQL 15 with Row-Level Security) and the Google Gemini 1.5 Flash Vision Multimodal AI inference endpoint.
   </p>
 
   <div class="diagram-box">
     <svg width="640" height="230" viewBox="0 0 640 230" fill="none" style="max-width: 100%;">
       <!-- Mobile Client Box -->
       <rect x="10" y="20" width="220" height="190" rx="8" fill="#F0F6F2" stroke="#244A32" stroke-width="2" />
-      <text x="120" y="42" font-size="11" font-weight="700" fill="#244A32" text-anchor="middle">REACT NATIVE / EXPO CLIENT</text>
+      <text x="120" y="42" font-size="11" font-weight="700" fill="#244A32" text-anchor="middle">BARE REACT NATIVE CLIENT</text>
       <rect x="25" y="55" width="190" height="28" rx="4" fill="#FFFFFF" stroke="#CBD5E1" />
       <text x="120" y="73" font-size="9" fill="#1E293B" text-anchor="middle">Presentation (Navigation & Screens)</text>
       <rect x="25" y="90" width="190" height="28" rx="4" fill="#FFFFFF" stroke="#CBD5E1" />
@@ -604,7 +604,7 @@ const htmlContent = `<!DOCTYPE html>
     <tbody>
       <tr>
         <td><strong>Mobile Runtime & Builds</strong></td>
-        <td>Expo Application Services (EAS)</td>
+        <td>Android Gradle builds</td>
         <td>Free managed builds (30 Android/iOS builds/mo)</td>
         <td>Stand-alone production APK compilation & live QR testing.</td>
       </tr>
@@ -916,7 +916,7 @@ export function calculateHaversineDistance(
 
   <h2>8.1 Multimodal Food Scanning Workflow</h2>
   <p>
-    Logging nutrition has historically been the primary point of user churn across fitness apps. AVFIT circumvents tedious manual ingredient entry by pairing native camera hardware capture (<code>expo-camera</code> / <code>expo-image-picker</code>) with <strong>Google Gemini 1.5 Flash Vision API</strong>.
+    Logging nutrition has historically been the primary point of user churn across fitness apps. AVFIT circumvents tedious manual ingredient entry by pairing native camera hardware capture (<code>react-native-image-picker</code>) with <strong>Google Gemini 1.5 Flash Vision API</strong>.
   </p>
 
   <div class="diagram-box">
@@ -990,7 +990,7 @@ Do not enclose in markdown code blocks. Provide raw JSON text only.\`;</code></p
     Each workout is conducted through an interactive player featuring:
   </p>
   <ul>
-    <li><strong>Dynamic Rep Counters:</strong> One-tap rep incrementation with tactile haptic feedback (<code>expo-haptics</code>).</li>
+    <li><strong>Dynamic Rep Counters:</strong> One-tap rep incrementation with tactile haptic feedback.</li>
     <li><strong>Automated Rest Countdown:</strong> Interval rest timers (30s, 45s, 60s) with audio cues and countdown animations.</li>
     <li><strong>Volume & Calorie Aggregation:</strong> Computes cumulative mechanical volume and caloric burn based on user weight and time under tension.</li>
   </ul>
@@ -1273,35 +1273,10 @@ Do not enclose in markdown code blocks. Provide raw JSON text only.\`;</code></p
   </table>
 
   <!-- SECTION 14 -->
-  <h1>14. Build Engineering, EAS Deployment & Roadmap</h1>
+  <h1>14. Android Build Engineering & Roadmap</h1>
 
-  <h2>14.1 Production EAS Build Configuration (eas.json)</h2>
-  <p>
-    AVFIT is configured for automated cloud builds via Expo Application Services (EAS):
-  </p>
-  <pre><code>// eas.json Build Configuration
-{
-  "cli": {
-    "version": ">= 9.0.0"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
-    },
-    "production": {
-      "android": {
-        "buildType": "app-bundle"
-      }
-    }
-  }
-}</code></pre>
+  <h2>14.1 Standalone Android APK Build</h2>
+  <p>Build a standalone Android package locally with <code>npm run android:apk</code>. The generated APK can be installed directly on Android phones for live testing.</p>
 
   <h2>14.2 Standalone Android APK Release</h2>
   <p>

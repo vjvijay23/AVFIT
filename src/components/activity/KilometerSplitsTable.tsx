@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   headerCell: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: Colors.textSecondary,
     letterSpacing: 0.5,
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   cellText: {
-    fontSize: 13,
+    fontSize: 14,
     color: Colors.textPrimary,
     fontWeight: '600',
   },
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: Colors.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
   },
   barContainer: {
     flex: 1,

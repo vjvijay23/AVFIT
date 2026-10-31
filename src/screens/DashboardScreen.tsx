@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroOverline: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '800',
     color: '#8A968E',
     letterSpacing: 0.8,
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
   },
   heroActionPillText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   heroMetricsSplitRow: {
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   engineSub: {
-    fontSize: 11.5,
+    fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 1,
   },
@@ -613,12 +613,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   pointsPillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     color: '#A16207',
   },
   trophyBannerSub: {
-    fontSize: 11.5,
+    fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
   },
@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   nextMilestoneText: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.textSecondary,
     maxWidth: 140,
   },
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   miniTrackPercent: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: Colors.accentOrange,
   },
@@ -671,15 +671,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   calloutTitle: {
-    fontSize: 14.5,
+    fontSize: 16,
     fontWeight: '800',
     color: '#FFFFFF',
   },
   calloutSub: {
-    fontSize: 11.5,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.85)',
     marginTop: 2,
-    lineHeight: 16,
+    lineHeight: 19,
   },
   recentSection: {
     marginBottom: 16,
@@ -724,12 +724,12 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   activityItemMeta: {
-    fontSize: 11,
+    fontSize: 12.5,
     color: Colors.textSecondary,
     marginTop: 2,
   },
   activityItemDate: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: Colors.textSecondary,
   },
@@ -756,7 +756,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   goalMeta: {
-    fontSize: 11,
+    fontSize: 12.5,
     color: Colors.textSecondary,
     marginTop: 2,
   },
@@ -767,7 +767,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusProgressText: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: '800',
     color: Colors.primary,
   },
@@ -778,7 +778,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusCompletedText: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: '800',
     color: Colors.accentOrange,
   },

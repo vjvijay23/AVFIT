@@ -53,7 +53,7 @@ This fragmented experience leads to app fatigue, inconsistent logging, and aband
 - **Quick Action Bar:** Floating action button (FAB) for "Scan Food", "Start Workout", or "Post to Community".
 
 ### Module 2: Step & Activity Tracking
-- **Hardware Sensor Integration:** Uses native device pedometer via `expo-sensors` (`Pedometer` API) on Android/iOS.
+- **Hardware Sensor Integration:** Uses native React Native modules for GPS and supported Android device sensors.
 - **Background Tracking:** Persists daily step metrics locally and syncs to Supabase on network connectivity.
 - **Metric Calculations:**
   - Distance: Estimated via step length formula ($Distance = Steps \times 0.762m$).
@@ -63,7 +63,7 @@ This fragmented experience leads to app fatigue, inconsistent logging, and aband
   - Active challenge cards (e.g. "Weekend 20K Step Blitz").
 
 ### Module 3: AI Food Scanner & Nutrition Calculator
-- **Camera Capture / Gallery Picker:** Native camera module (`expo-camera`) to snap photo of meal.
+- **Camera Capture / Gallery Picker:** `react-native-image-picker` for meal photo capture and selection.
 - **Multimodal AI Analysis:** Image submitted to Google Gemini 1.5 Flash API with custom nutrition prompt.
 - **Extracted Fields:**
   - Primary dish identification (e.g., "Grilled Salmon with Quinoa and Steamed Broccoli").
@@ -118,4 +118,4 @@ This fragmented experience leads to app fatigue, inconsistent logging, and aband
   - User health data strictly sandboxed.
   - Row Level Security (RLS) on Supabase ensuring users can only view their own private health logs.
   - Public community posts opt-in by explicit toggle.
-- **Cost Ceiling:** \$0 operational baseline during MVP validation (Supabase free tier + Gemini API free tier + Expo free tier).
+- **Cost Ceiling:** \$0 operational baseline during MVP validation (Supabase and Gemini API free tiers).

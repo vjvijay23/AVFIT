@@ -9,19 +9,19 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
+  PermissionsAndroid,
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
+import { launchCamera, launchImageLibrary, type Asset, type ImagePickerResponse } from 'react-native-image-picker';
 import { Colors } from '../theme/colors';
 import { FoodNutritionEstimate } from '../types';
 import { ActivityService } from '../services/activityService';
 import { AuthService } from '../services/auth';
 import { BackendApi } from '../services/backendApi';
 import { adjustNutritionPortion } from '../services/foodNutrition';
-import { getFoodImageTransform } from '../services/foodImageGeometry';
+import AppNoticeCard from '../components/common/AppNoticeCard';
 import {
   Camera as CameraIcon,
   Sparkles,
@@ -32,52 +32,48 @@ import {
   Image as ImageIcon,
   Save,
   Check,
+  ChevronRight,
+  X,
 } from 'lucide-react-native';
 
 const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'] as const;
 type MealCategory = (typeof MEAL_CATEGORIES)[number];
 
-type PreparedFoodImage = { uri: string; base64: string; mimeType: 'image/jpeg'; width: number; height: number };
+type PreparedFoodImage = { uri: string; base64: string; mimeType: 'image/jpeg' | 'image/png'; width: number; height: number };
 
-async function prepareFoodImage(asset: ImagePicker.ImagePickerAsset): Promise<PreparedFoodImage> {
+async function prepareFoodImage(asset: Asset): Promise<PreparedFoodImage> {
   const imageStarted = performance.now();
-  const sourceWidth = Math.max(1, asset.width || 1024);
-  const sourceHeight = Math.max(1, asset.height || 768);
-  const { crop, resizeWidth } = getFoodImageTransform(sourceWidth, sourceHeight);
-  const cropActions: ImageManipulator.Action[] = [{ crop }, { resize: { width: resizeWidth } }];
-
-  // ImageManipulator uses the native image pipeline, keeping full-resolution
-  // decode, crop, resize, and JPEG compression off the React Native JS thread.
-  const manipulated = await ImageManipulator.manipulateAsync(asset.uri, cropActions, {
-    compress: 0.65,
-    format: ImageManipulator.SaveFormat.JPEG,
-    // On web, FileSystem's native Base64 reader is not available. Android reads
-    // the already-compressed JPEG asynchronously in a separate measured step.
-    base64: Platform.OS === 'web',
-  });
-  const imageProcessingMs = performance.now() - imageStarted;
-
-  const base64Started = performance.now();
-  const base64 = manipulated.base64 || await FileSystem.readAsStringAsync(manipulated.uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const base64EncodingMs = performance.now() - base64Started;
+  const base64 = asset.base64;
   if (!base64) throw new Error('The selected image could not be encoded. Please choose another photo.');
   const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
 
   console.info('[FoodScan] Image prepared', {
-    imageProcessingMs: Math.round(imageProcessingMs),
-    base64EncodingMs: Math.round(base64EncodingMs),
-    width: manipulated.width,
-    height: manipulated.height,
+    imageProcessingMs: Math.round(performance.now() - imageStarted),
+    width: asset.width,
+    height: asset.height,
     compressedBytes: Math.floor(base64.length * 3 / 4) - padding,
-    base64EncodingIncludedInImageProcessing: Platform.OS === 'web',
+    base64EncodingIncludedInImageProcessing: true,
   });
-  return { uri: manipulated.uri, base64, mimeType: 'image/jpeg', width: manipulated.width, height: manipulated.height };
+  return { uri: asset.uri || '', base64, mimeType: asset.type === 'image/png' ? 'image/png' : 'image/jpeg', width: asset.width || 0, height: asset.height || 0 };
+}
+
+function firstAsset(result: ImagePickerResponse): Asset | undefined {
+  return result.didCancel || result.errorCode ? undefined : result.assets?.[0];
 }
 
 function nextFrame() {
   return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+function mealIngredients(value: unknown): Array<Record<string, any>> {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 export default function FoodScannerScreen({ navigation }: any) {
@@ -91,6 +87,8 @@ export default function FoodScannerScreen({ navigation }: any) {
   const [isSaved, setIsSaved] = useState(false);
   const [mealId, setMealId] = useState<string | null>(null);
   const [recentMeals, setRecentMeals] = useState<Array<Record<string, any>>>([]);
+  const [selectedMeal, setSelectedMeal] = useState<Record<string, any> | null>(null);
+  const [screenNotice, setScreenNotice] = useState<{ message: string; tone: 'success' | 'error' } | null>(null);
 
   const requireSignIn = () => {
     if (BackendApi.hasAuthToken()) return true;
@@ -109,12 +107,21 @@ export default function FoodScannerScreen({ navigation }: any) {
   const loadMeals = async () => {
     if (!BackendApi.hasAuthToken()) return;
     try {
-      const response = await BackendApi.getMeals(new Date().toISOString().slice(0, 10));
+      // Load the user's saved entries, not just today's UTC date, so older
+      // meals stay available from the diary and can be opened for details.
+      const response = await BackendApi.getMeals();
       setRecentMeals(response.meals);
-    } catch { /* The scanner remains usable when meal history is temporarily unavailable. */ }
+    } catch (error) {
+      console.warn('[FoodScanner] Could not load saved meals', error);
+      setScreenNotice({ message: 'Saved meal history is temporarily unavailable. You can still scan a new meal.', tone: 'error' });
+    }
   };
 
-  useEffect(() => { loadMeals(); }, []);
+  useEffect(() => {
+    void loadMeals();
+    const unsubscribe = navigation?.addListener?.('focus', () => { void loadMeals(); });
+    return unsubscribe;
+  }, [navigation]);
 
   const [scannedResult, setScannedResult] = useState<FoodNutritionEstimate | null>(null);
 
@@ -129,51 +136,58 @@ export default function FoodScannerScreen({ navigation }: any) {
   const handlePickImage = async () => {
     if (!requireSignIn()) return;
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        // Keep the original composition visible; image preparation is handled
-        // automatically after selection without opening the native crop editor.
-        allowsEditing: false,
-        quality: 1,
-        base64: false,
+      const response = await launchImageLibrary({
+        mediaType: 'photo', selectionLimit: 1, includeBase64: true,
+        maxWidth: 1440, maxHeight: 1440, quality: 0.7,
       });
-
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImageUri(result.assets[0].uri);
-        await runFoodScan(result.assets[0]);
+      if (response.errorCode) throw new Error(response.errorMessage || 'Could not open your photo library. Please try again.');
+      const asset = firstAsset(response);
+      if (asset?.uri) {
+        setSelectedImageUri(asset.uri);
+        await runFoodScan(asset);
       }
     } catch (e: any) {
-      Alert.alert('Food Scan Failed', e?.message || 'Could not analyze this photo.');
+      setScreenNotice({ message: e?.message || 'Could not analyze this photo. Check your connection and try again.', tone: 'error' });
     }
   };
 
   const handleCaptureImage = async () => {
     if (!requireSignIn()) return;
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Camera Permission', 'Please allow camera access to scan meals directly.');
-        return;
+      if (Platform.OS === 'android') {
+        const cameraPermission = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA, {
+          title: 'Allow AVFIT to use your camera',
+          message: 'Camera access lets you photograph a meal for nutrition analysis.',
+          buttonPositive: 'Allow',
+          buttonNegative: 'Not now',
+        });
+        if (cameraPermission !== PermissionsAndroid.RESULTS.GRANTED) {
+          const permanentlyDenied = cameraPermission === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN;
+          throw new Error(permanentlyDenied
+            ? 'Camera access is blocked. Open Android Settings > Apps > AVFIT > Permissions and allow Camera, or select a photo instead.'
+            : 'Allow camera access to take a food photo, or select a photo from your gallery.');
+        }
       }
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: false,
-        quality: 1,
-        base64: false,
+      const response = await launchCamera({
+        mediaType: 'photo', includeBase64: true, maxWidth: 1440, maxHeight: 1440, quality: 0.7,
+        saveToPhotos: false,
       });
-
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImageUri(result.assets[0].uri);
-        await runFoodScan(result.assets[0]);
+      if (response.errorCode) throw new Error(response.errorMessage || 'Could not open the camera. Check AVFIT camera permission in Settings.');
+      const asset = firstAsset(response);
+      if (asset?.uri) {
+        setSelectedImageUri(asset.uri);
+        await runFoodScan(asset);
       }
     } catch (e: any) {
-      Alert.alert('Food Scan Failed', e?.message || 'Could not analyze this photo.');
+      setScreenNotice({ message: e?.message || 'Could not analyze this photo. Check your connection and try again.', tone: 'error' });
     }
   };
 
-  const runFoodScan = async (asset: ImagePicker.ImagePickerAsset) => {
+  const runFoodScan = async (asset: Asset) => {
     if (scanInFlight.current) return;
     scanInFlight.current = true;
     setIsScanning(true);
+    setScreenNotice(null);
     setScanStage('Preparing a 4:3 food photo…');
     setIsSaved(false);
     setMealId(null);
@@ -191,6 +205,7 @@ export default function FoodScannerScreen({ navigation }: any) {
       setScannedResult(result);
       setPortionGrams(result.estimated_weight_g);
       setMealId(result.mealId || null);
+      setScreenNotice({ message: 'Nutrition estimate is ready. Values are estimates; adjust the portion to match your meal.', tone: 'success' });
     } finally {
       scanInFlight.current = false;
       setIsScanning(false);
@@ -225,9 +240,9 @@ export default function FoodScannerScreen({ navigation }: any) {
       }
       setIsSaved(true);
       await loadMeals();
-      Alert.alert('Meal Logged', `${scannedResult.dish_name} (${scannedResult.calories} kcal) saved to your ${selectedCategory} diary.`);
+      setScreenNotice({ message: `${scannedResult.dish_name} (${scannedResult.calories} kcal) saved to your ${selectedCategory} diary.`, tone: 'success' });
     } catch (e: any) {
-      Alert.alert('Save Failed', e?.message || 'Could not save this meal.');
+      setScreenNotice({ message: e?.message || 'Could not save this meal. Please try again.', tone: 'error' });
     }
   };
 
@@ -273,6 +288,13 @@ export default function FoodScannerScreen({ navigation }: any) {
             </TouchableOpacity>
           ))}
         </View>
+
+        {screenNotice && <>
+          <AppNoticeCard message={screenNotice.message} tone={screenNotice.tone} compact />
+          {!BackendApi.hasAuthToken() && <TouchableOpacity style={styles.signInButton} onPress={() => navigation.navigate('Login')}>
+            <Text style={styles.signInButtonText}>Sign in to scan and save meals</Text>
+          </TouchableOpacity>}
+        </>}
 
         {/* Viewfinder Camera Box */}
         <View style={styles.cameraBox}>
@@ -403,19 +425,111 @@ export default function FoodScannerScreen({ navigation }: any) {
         </View>}
 
         {recentMeals.length > 0 && <View style={styles.diaryCard}>
-          <Text style={styles.ingredientsTitle}>Today’s Food Diary</Text>
-          {recentMeals.map((meal) => <View key={meal.id} style={styles.ingredientRow}>
-            <Text style={styles.ingredientName}>{meal.dish_name}</Text>
-            <Text style={styles.ingredientMeta}>{meal.meal_type} · {meal.calories} kcal</Text>
-          </View>)}
+          <Text style={styles.ingredientsTitle}>Saved Food Diary</Text>
+          <Text style={styles.diarySubTitle}>Tap a meal to open its nutrition details.</Text>
+          {recentMeals.map((meal) => <TouchableOpacity
+            key={meal.id}
+            style={styles.diaryMealRow}
+            onPress={() => setSelectedMeal(meal)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${meal.dish_name || 'saved meal'} nutrition details`}
+          >
+            <View style={styles.diaryMealMain}>
+              <Text style={styles.ingredientName} numberOfLines={1}>{meal.dish_name || 'Saved meal'}</Text>
+              <Text style={styles.diaryMealMeta}>
+                {(meal.meal_type || 'meal').toString().replace(/^./, (letter: string) => letter.toUpperCase())}
+                {meal.logged_at ? ` · ${new Date(meal.logged_at).toLocaleDateString()}` : ''}
+              </Text>
+            </View>
+            <Text style={styles.ingredientMeta}>{Number(meal.calories || 0)} kcal</Text>
+            <ChevronRight size={18} color={Colors.textSecondary} />
+          </TouchableOpacity>)}
         </View>}
       </ScrollView>
+
+      <Modal
+        visible={!!selectedMeal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedMeal(null)}
+      >
+        <View style={styles.mealModalOverlay}>
+          <View style={[styles.mealModalCard, { paddingBottom: Math.max(insets.bottom + 20, 28) }]}>
+            <View style={styles.mealModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.mealModalTitle}>{selectedMeal?.dish_name || 'Meal details'}</Text>
+                <Text style={styles.diarySubTitle}>
+                  {selectedMeal?.logged_at ? new Date(selectedMeal.logged_at).toLocaleString() : 'Saved food diary entry'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.mealModalClose}
+                onPress={() => setSelectedMeal(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Close meal details"
+              >
+                <X size={20} color={Colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.mealCaloriesCard}>
+                <Text style={styles.mealCaloriesValue}>{Number(selectedMeal?.calories || 0)}</Text>
+                <Text style={styles.mealCaloriesLabel}>KCAL</Text>
+                <Text style={styles.mealPortionText}>Estimated portion · {Number(selectedMeal?.portion_grams || 0)} g</Text>
+              </View>
+              <View style={styles.mealMacroGrid}>
+                <View style={styles.mealMacroCell}><Text style={styles.mealMacroValue}>{Number(selectedMeal?.protein_g || 0)} g</Text><Text style={styles.mealMacroLabel}>Protein</Text></View>
+                <View style={styles.mealMacroCell}><Text style={styles.mealMacroValue}>{Number(selectedMeal?.carbs_g || 0)} g</Text><Text style={styles.mealMacroLabel}>Carbs</Text></View>
+                <View style={styles.mealMacroCell}><Text style={styles.mealMacroValue}>{Number(selectedMeal?.fat_g || 0)} g</Text><Text style={styles.mealMacroLabel}>Fat</Text></View>
+                <View style={styles.mealMacroCell}><Text style={styles.mealMacroValue}>{Number(selectedMeal?.fiber_g || 0)} g</Text><Text style={styles.mealMacroLabel}>Fiber</Text></View>
+              </View>
+              <View style={styles.mealDetailRows}>
+                <View style={styles.nutrientRow}><Text style={styles.ingredientName}>Meal</Text><Text style={styles.ingredientMeta}>{(selectedMeal?.meal_type || 'meal').toString()}</Text></View>
+                <View style={styles.nutrientRow}><Text style={styles.ingredientName}>Sugars</Text><Text style={styles.ingredientMeta}>{Number(selectedMeal?.sugars_g || 0)} g</Text></View>
+                <View style={styles.nutrientRow}><Text style={styles.ingredientName}>Saturated fat</Text><Text style={styles.ingredientMeta}>{Number(selectedMeal?.saturated_fat_g || 0)} g</Text></View>
+                <View style={styles.nutrientRow}><Text style={styles.ingredientName}>Sodium</Text><Text style={styles.ingredientMeta}>{Number(selectedMeal?.sodium_mg || 0)} mg</Text></View>
+                <View style={styles.nutrientRow}><Text style={styles.ingredientName}>Cholesterol</Text><Text style={styles.ingredientMeta}>{Number(selectedMeal?.cholesterol_mg || 0)} mg</Text></View>
+              </View>
+              {!!selectedMeal?.health_tips && <Text style={styles.healthTip}>{selectedMeal.health_tips}</Text>}
+              {mealIngredients(selectedMeal?.ingredients).length > 0 && <>
+                <Text style={[styles.ingredientsTitle, { marginTop: 12 }]}>Ingredients</Text>
+                {mealIngredients(selectedMeal?.ingredients).map((item: any, index: number) => <View key={`${item.name || 'ingredient'}-${index}`} style={styles.ingredientRow}>
+                  <Text style={styles.ingredientName}>{item.name || 'Ingredient'}</Text>
+                  <Text style={styles.ingredientMeta}>{Number(item.weight_g || 0)} g · {Number(item.calories || 0)} kcal</Text>
+                </View>)}
+              </>}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   diaryCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginTop: 14, borderWidth: 1, borderColor: Colors.borderSubtle },
+  signInButton: { alignSelf: 'flex-start', marginTop: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: Colors.primary },
+  signInButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
+  diarySubTitle: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
+  diaryMealRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderSubtle },
+  diaryMealMain: { flex: 1, minWidth: 0 },
+  diaryMealMeta: { color: Colors.textSecondary, fontSize: 12, marginTop: 3 },
+  mealModalOverlay: { flex: 1, backgroundColor: 'rgba(18, 26, 21, 0.45)', justifyContent: 'flex-end' },
+  mealModalCard: { maxHeight: '82%', backgroundColor: Colors.background, borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 20 },
+  mealModalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  mealModalTitle: { fontSize: 21, lineHeight: 27, fontWeight: '900', color: Colors.textPrimary },
+  mealModalClose: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
+  mealCaloriesCard: { backgroundColor: '#E8F1EC', borderRadius: 18, padding: 18, alignItems: 'center', marginBottom: 14 },
+  mealCaloriesValue: { fontSize: 36, fontWeight: '900', color: Colors.primary },
+  mealCaloriesLabel: { color: Colors.primary, fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+  mealPortionText: { color: Colors.textSecondary, fontSize: 13, marginTop: 6 },
+  mealMacroGrid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#FFFFFF', borderRadius: 16, paddingVertical: 12, marginBottom: 12 },
+  mealMacroCell: { width: '50%', alignItems: 'center', paddingVertical: 10 },
+  mealMacroValue: { color: Colors.textPrimary, fontSize: 18, fontWeight: '800' },
+  mealMacroLabel: { color: Colors.textSecondary, fontSize: 13, marginTop: 3 },
+  mealDetailRows: { backgroundColor: '#FFFFFF', borderRadius: 14, paddingHorizontal: 12 },
   nutrientRows: { marginTop: 4, marginBottom: 10 },
   nutrientRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderSubtle },
   healthTip: { color: '#59645D', fontSize: 12, lineHeight: 18, backgroundColor: '#EFF5F0', padding: 11, borderRadius: 12, marginVertical: 8 },

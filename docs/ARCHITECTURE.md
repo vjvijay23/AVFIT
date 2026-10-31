@@ -1,6 +1,6 @@
 # FitPulse Mobile Application - Technical Architecture
 
-**Platform:** React Native (Expo Managed Workflow)  
+**Platform:** Bare React Native Android application  
 **Language:** TypeScript  
 **Backend:** Supabase (PostgreSQL, Auth, Storage, Realtime)  
 **AI Vision:** Google Gemini 1.5 Flash (Multimodal API)  
@@ -11,7 +11,7 @@
 
 ```mermaid
 graph TB
-    subgraph "Mobile Device (React Native / Expo)"
+    subgraph "Mobile Device (Bare React Native)"
         UI["UI Layer (Screens & Components)"]
         Nav["React Navigation (Bottom Tabs + Stacks)"]
         State["State Management (Zustand + AsyncStorage)"]
@@ -40,13 +40,12 @@ graph TB
 
 ## 2. Technology Stack Rationale
 
-### 2.1 Why React Native + Expo?
+### 2.1 Why Bare React Native?
 1. **Single Codebase for Both Platforms:** 100% code reuse for Android (primary target) and iOS (future release).
-2. **Instant Physical Device Testing:** Both developers can scan an Expo QR code to test on real Android devices immediately via `Expo Go`, without configuring Android Studio SDK emulators or needing macOS.
+2. **Installable Device Testing:** Android builds are packaged as APKs for installation and live testing on physical devices.
 3. **Hardware Access:** Robust managed libraries:
-   - `expo-sensors`: Native pedometer access without complex Android native bridging.
-   - `expo-camera` / `expo-image-picker`: Fast photo capture for the AI food scanner.
-   - `expo-haptics`: Tactile feedback on workout timers and likes.
+   - React Native native modules provide device sensors, GPS, image selection, secure storage, and biometric authentication.
+   - `react-native-image-picker`: Native photo capture and gallery access for the food scanner.
 4. **Zero Licensing Costs:** Open-source MIT ecosystem.
 
 ### 2.2 Why Supabase for Backend?
@@ -136,7 +135,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant User
-    participant Camera as Expo Camera
+    participant Camera as Native Camera
     participant Client as FitPulse App
     participant Gemini as Gemini 1.5 Flash
     participant DB as Supabase meals table
@@ -154,7 +153,7 @@ sequenceDiagram
 
 ## 5. Security & Offline Resilience
 
-1. **API Keys Protection:** API keys stored in `.env` and accessed via `expo-constants`. For production builds, Gemini calls can be routed through a Supabase Edge Function to avoid client-side API key exposure.
+1. **API Keys Protection:** Client configuration is read from `.env` using `react-native-config`. Sensitive provider keys should stay on the backend and never ship in the APK.
 2. **Offline Mode:**
    - Step counts and completed workouts are written to `AsyncStorage` immediately.
    - When offline, network calls are appended to an `offlineQueue`.

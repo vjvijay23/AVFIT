@@ -21,8 +21,9 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import { BackendApi } from '../services/backendApi';
+import AppNoticeCard from '../components/common/AppNoticeCard';
 
-export default function CommunityScreen() {
+export default function CommunityScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +36,7 @@ export default function CommunityScreen() {
   const [commentsByPost, setCommentsByPost] = useState<Record<string, Array<Record<string, any>>>>({});
   const [commentDraft, setCommentDraft] = useState('');
   const [postingComment, setPostingComment] = useState(false);
+  const [likingPostIds, setLikingPostIds] = useState<Record<string, boolean>>({});
 
   const loadPosts = useCallback(async () => {
     setIsLoading(true);
@@ -60,7 +62,11 @@ export default function CommunityScreen() {
     }
   }, []);
 
-  useEffect(() => { loadPosts(); }, [loadPosts]);
+  useEffect(() => {
+    loadPosts();
+    const unsubscribe = navigation?.addListener?.('focus', loadPosts);
+    return unsubscribe;
+  }, [loadPosts, navigation]);
 
   useEffect(() => {
     BackendApi.getChallenges().then((result) => setChallenges(result.challenges)).catch(() => setChallenges([]));
@@ -107,13 +113,20 @@ export default function CommunityScreen() {
     if (!content || postingComment) return;
     setPostingComment(true);
     try {
-      await BackendApi.createPostComment(postId, content);
+      const response: any = await BackendApi.createPostComment(postId, content);
+      if (response?.comment) {
+        setCommentsByPost((current) => ({
+          ...current,
+          [postId]: [...(current[postId] || []), response.comment],
+        }));
+      }
       setCommentDraft('');
-      const refreshed = await BackendApi.getPostComments(postId);
-      setCommentsByPost((current) => ({ ...current, [postId]: refreshed.comments }));
       setPosts((items) => items.map((item) => item.id === postId ? { ...item, comments: item.comments + 1 } : item));
+      setFeedError('');
     } catch (error: any) {
-      Alert.alert('Could not add comment', error?.message || 'Please try again.');
+      const message = error?.message || 'Please try again.';
+      setFeedError(message);
+      Alert.alert('Could not add comment', message);
     } finally {
       setPostingComment(false);
     }
@@ -121,12 +134,15 @@ export default function CommunityScreen() {
 
   const toggleLike = async (id: string) => {
     const post = posts.find((item) => item.id === id);
-    if (!post || post.hasLiked) return;
+    if (!post || post.hasLiked || likingPostIds[id]) return;
+    setLikingPostIds((current) => ({ ...current, [id]: true }));
     try {
       const result = await BackendApi.likeCommunityPost(id);
       setPosts((prev) => prev.map((item) => item.id === id ? { ...item, hasLiked: true, likes: result.likesCount } : item));
     } catch (error: any) {
       setFeedError(error?.message || 'Could not send high-five.');
+    } finally {
+      setLikingPostIds((current) => ({ ...current, [id]: false }));
     }
   };
 
@@ -177,7 +193,12 @@ export default function CommunityScreen() {
 
         {/* Post Stream */}
         {isLoading && <ActivityIndicator color={Colors.primary} style={{ marginVertical: 24 }} />}
-        {!isLoading && feedError !== '' && <Text style={styles.postBody}>{feedError}</Text>}
+        {!isLoading && feedError !== '' && <>
+          <AppNoticeCard message={feedError} tone="error" compact />
+          {!BackendApi.hasAuthToken() && <TouchableOpacity style={styles.publishButton} onPress={() => navigation?.navigate?.('Login')}>
+            <Text style={styles.publishButtonText}>Sign in to use the community</Text>
+          </TouchableOpacity>}
+        </>}
         {!isLoading && !feedError && posts.length === 0 && <Text style={styles.postBody}>No community posts yet. Sign in and share your first update.</Text>}
         {posts.map((post) => (
           <View key={post.id} style={styles.postCard}>
@@ -205,6 +226,9 @@ export default function CommunityScreen() {
               <TouchableOpacity
                 style={styles.actionItem}
                 onPress={() => toggleLike(post.id)}
+                disabled={Boolean(likingPostIds[post.id]) || post.hasLiked}
+                accessibilityRole="button"
+                accessibilityLabel={post.hasLiked ? `You high-fived this post. ${post.likes} high-fives` : `High-five post. ${post.likes} high-fives`}
               >
                 <Heart
                   size={16}
@@ -217,7 +241,7 @@ export default function CommunityScreen() {
                     post.hasLiked && { color: Colors.accentOrange, fontWeight: '800' },
                   ]}
                 >
-                  {post.likes} High-Fives
+                  {likingPostIds[post.id] ? 'Sending…' : `${post.likes} High-Fives`}
                 </Text>
               </TouchableOpacity>
 

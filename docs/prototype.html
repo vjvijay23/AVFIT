@@ -530,7 +530,7 @@
             <span id="spec-pill" class="text-xs font-bold px-3 py-1 rounded-full bg-[#E8F1EC] text-[#244A32] border border-[#C5DDCF]">
               Screen 1: Home & Active Stats
             </span>
-            <span class="text-xs font-mono text-[#6B726C]">React Native • Expo</span>
+            <span class="text-xs font-mono text-[#6B726C]">React Native • Android</span>
           </div>
 
           <h2 id="spec-title" class="text-xl font-extrabold text-[#191C1A] mb-2">
@@ -586,18 +586,19 @@
         <!-- Android Quick Start Guide -->
         <div class="bg-white border border-[#E8DFC8] rounded-[28px] p-5 text-xs text-[#6B726C] space-y-3 shadow-sm">
           <div class="flex items-center justify-between">
-            <h3 class="font-extrabold text-[#191C1A] text-sm">📲 Testing This App on Android with Expo Go</h3>
+            <h3 class="font-extrabold text-[#191C1A] text-sm">📲 Install and Test the Android App</h3>
             <span class="text-[#244A32] font-bold">React Native Mobile</span>
           </div>
           <p>
-            The entire source code in your directory is structured with this exact design system. Run it immediately:
+            Build a standalone APK and install it on an Android phone for live testing:
           </p>
           <div class="bg-[#161A17] p-3 rounded-2xl font-mono text-[11px] text-[#A8D5BA] space-y-1">
-            <div class="text-[#6F7771]"># Install dependencies</div>
-            <div class="text-white">npm install</div>
-            <div class="text-[#6F7771]"># Start Expo development server</div>
-            <div class="text-white">npx expo start</div>
-            <div class="text-[#E07A5F]"># Scan QR code in terminal using Expo Go app on Android</div>
+            <div class="text-[#6F7771]"># Install project dependencies</div>
+            <div class="text-white">npm ci</div>
+            <div class="text-[#6F7771]"># Build standalone release APK</div>
+            <div class="text-white">npm run android:apk</div>
+            <div class="text-[#E07A5F]"># Install on a connected Android phone</div>
+            <div class="text-white">adb install -r AVFIT-native-1.1.2.apk</div>
           </div>
         </div>
 

@@ -8,6 +8,7 @@ import { ArrowRight, Fingerprint, Lock, ShieldCheck } from 'lucide-react-native'
 import { Colors } from '../../theme/colors';
 import { AuthService } from '../../services/auth';
 import AvfitLogo from '../../components/common/AvfitLogo';
+import AppNoticeCard from '../../components/common/AppNoticeCard';
 
 const COUNTRY_CODES = [
   { code: '+1', name: 'US / CA', flag: '🇺🇸' }, { code: '+91', name: 'India', flag: '🇮🇳' },
@@ -89,7 +90,7 @@ export default function LoginScreen({ navigation, route }: any) {
           <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>Sign in securely with your four-digit PIN. SMS verification is only needed for account recovery.</Text>
 
-          {!!error && <View style={styles.errorBox}><Text style={styles.errorText}>{error}</Text></View>}
+          {!!error && <AppNoticeCard message={error} tone="error" compact />}
 
           <Text style={styles.label}>Mobile number</Text>
           <View style={styles.phoneRow}>
@@ -133,8 +134,6 @@ const styles = StyleSheet.create({
   iconCircle: { alignSelf: 'center', width: 62, height: 62, borderRadius: 31, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   title: { fontSize: 27, fontWeight: '900', color: Colors.textPrimary, textAlign: 'center' },
   subtitle: { fontSize: 15, lineHeight: 22, color: Colors.textSecondary, marginTop: 8, marginBottom: 22, textAlign: 'center' },
-  errorBox: { backgroundColor: '#FCE7E5', borderRadius: 13, padding: 13, marginBottom: 16 },
-  errorText: { color: Colors.danger, fontWeight: '700', fontSize: 14, lineHeight: 20 },
   label: { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.45, color: Colors.textPrimary, marginBottom: 8 },
   phoneRow: { flexDirection: 'row', minHeight: 58, borderRadius: 15, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: '#FAFAF8', overflow: 'hidden' },
   countryButton: { paddingHorizontal: 14, backgroundColor: Colors.surfaceWarm, borderRightWidth: 1, borderRightColor: Colors.border, justifyContent: 'center' },

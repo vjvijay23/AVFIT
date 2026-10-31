@@ -1,10 +1,10 @@
 import { FoodNutritionEstimate, GPSPoint } from '../types';
 import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { SecureStorage } from './secureStorage';
+import Config from 'react-native-config';
 
-// Point the app at the deployed API by default. Set EXPO_PUBLIC_API_URL to a local
-// backend URL when developing against a local server (Android emulator: 10.0.2.2).
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://avfit-api.onrender.com/api/v1').replace(/\/$/, '');
+// Set AVFIT_API_URL in .env to target a local backend during development.
+const API_BASE_URL = (Config.AVFIT_API_URL || 'https://avfit-api.onrender.com/api/v1').replace(/\/$/, '');
 let authToken: string | null = null;
 const AUTH_SESSION_KEY = 'avfit.backend.auth-session';
 
@@ -13,8 +13,8 @@ type SavedAuthSession = { token: string; userId: string };
 async function saveAuthSession(session: SavedAuthSession | null): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
-    if (session) await SecureStore.setItemAsync(AUTH_SESSION_KEY, JSON.stringify(session));
-    else await SecureStore.deleteItemAsync(AUTH_SESSION_KEY);
+    if (session) await SecureStorage.setItemAsync(AUTH_SESSION_KEY, JSON.stringify(session));
+    else await SecureStorage.deleteItemAsync(AUTH_SESSION_KEY);
   } catch {
     // Keep the current session usable even if device secure storage is unavailable.
   }
@@ -31,10 +31,38 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
   const requestHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...(headers as Record<string, string> | undefined) };
   if (authenticated && authToken) requestHeaders.Authorization = `Bearer ${authToken}`;
   onRequestStart?.();
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers: requestHeaders });
+  const requestController = init.signal ? null : new AbortController();
+  const requestTimeout = requestController
+    ? setTimeout(() => requestController.abort(), 75_000)
+    : null;
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: requestHeaders,
+      ...(requestController ? { signal: requestController.signal } : {}),
+    });
+  } catch (error: any) {
+    if (requestController?.signal.aborted) {
+      throw new Error('AVFIT took too long to respond. Check your connection and try again.');
+    }
+    if (error?.name === 'TypeError') {
+      throw new Error('Could not connect to AVFIT. Check your internet connection and try again.');
+    }
+    throw error;
+  } finally {
+    if (requestTimeout) clearTimeout(requestTimeout);
+  }
   onResponse?.(response);
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body?.error || `Backend request failed (${response.status})`);
+  if (!response.ok) {
+    if (response.status === 401 && authenticated && authToken) {
+      authToken = null;
+      await saveAuthSession(null);
+      throw new Error('Your sign-in has expired. Sign in again to continue.');
+    }
+    throw new Error(body?.error || `Backend request failed (${response.status})`);
+  }
   return body as T;
 }
 
@@ -58,11 +86,11 @@ export const BackendApi = {
   async restoreAuthSession(): Promise<string | null> {
     if (Platform.OS === 'web') return null;
     try {
-      const raw = await SecureStore.getItemAsync(AUTH_SESSION_KEY);
+      const raw = await SecureStorage.getItemAsync(AUTH_SESSION_KEY);
       if (!raw) return null;
       const session = JSON.parse(raw) as Partial<SavedAuthSession>;
       if (typeof session.token !== 'string' || typeof session.userId !== 'string') {
-        await SecureStore.deleteItemAsync(AUTH_SESSION_KEY);
+        await SecureStorage.deleteItemAsync(AUTH_SESSION_KEY);
         return null;
       }
       authToken = session.token;

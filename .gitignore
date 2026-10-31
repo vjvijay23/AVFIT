@@ -1,6 +1,5 @@
-# Node & Expo
+# Node packages and caches
 node_modules/
-.expo/
 dist/
 web-build/
 npm-debug.*

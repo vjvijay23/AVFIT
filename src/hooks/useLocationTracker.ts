@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import * as Location from 'expo-location';
+import { type GeoPosition } from 'react-native-geolocation-service';
+import { getCurrentLocation, getLocationPermission, requestLocationPermission, watchLocation, type LocationSubscription } from '../services/locationAdapter';
 import { GPSPoint } from '../types';
 
 export type TrackingStatus =
@@ -85,12 +86,13 @@ export function useLocationTracker() {
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [lastUpdateTime, setLastUpdateTime] = useState<string | null>(null);
 
-  const locationSubscription = useRef<Location.LocationSubscription | null>(null);
+  const locationSubscription = useRef<LocationSubscription | null>(null);
   const timerInterval = useRef<any>(null);
   const lastAcceptedPoint = useRef<GPSPoint | null>(null);
   const totalDistanceRef = useRef(0);
   const activeDurationRef = useRef(0);
   const lastGpsSampleAtRef = useRef(0);
+  const trackingStartedAtRef = useRef(0);
   const isTrackingActive = useRef<boolean>(false);
   const isPausedRef = useRef<boolean>(false);
 
@@ -104,7 +106,7 @@ export function useLocationTracker() {
       let permStatus: string;
       let canAskAgain = false;
       try {
-        const permResult = await Location.requestForegroundPermissionsAsync();
+        const permResult = await requestLocationPermission();
         permStatus = permResult.status;
         canAskAgain = permResult.canAskAgain;
       } catch (pErr) {
@@ -123,7 +125,7 @@ export function useLocationTracker() {
         } else {
           setPermissionState('denied');
           setErrorMessage(
-            'Foreground location permission is required to track your workout route and distance.'
+            'Allow Precise location for AVFIT in Android Settings. Approximate location cannot record an accurate workout route.'
           );
         }
         setStatus('error');
@@ -133,18 +135,11 @@ export function useLocationTracker() {
       setPermissionState('granted');
 
       // Fetch initial position with fast lastKnown fallback and 1.5s timeout
-      let initialLocation: Location.LocationObject | null = null;
+      let initialLocation: GeoPosition | null = null;
       try {
-        initialLocation = await Location.getLastKnownPositionAsync();
-        if (!initialLocation) {
-          const timeoutPromise = new Promise<null>((resolve) =>
-            setTimeout(() => resolve(null), 1500)
-          );
-          const locationPromise = Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          initialLocation = await Promise.race([locationPromise, timeoutPromise]);
-        }
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+        const locationPromise = getCurrentLocation(2500, false);
+        initialLocation = await Promise.race([locationPromise, timeoutPromise]);
       } catch (locErr) {
         console.warn('Initial location fetch timeout/error:', locErr);
       }
@@ -198,7 +193,7 @@ export function useLocationTracker() {
   }, [requestPermissions]);
 
   // 2. Location processing callback with rigorous filtering
-  const processLocationUpdate = useCallback((newLoc: Location.LocationObject) => {
+  const processLocationUpdate = useCallback((newLoc: GeoPosition) => {
     if (!isTrackingActive.current || isPausedRef.current) return;
     lastGpsSampleAtRef.current = Date.now();
 
@@ -214,12 +209,16 @@ export function useLocationTracker() {
       timestamp,
     };
 
-    if (accuracy && accuracy > 25) {
+    if (accuracy && accuracy > 60) {
       setGpsAccuracy(Math.round(accuracy));
       setLastUpdateTime(new Date(timestamp).toLocaleTimeString());
+      if (Date.now() - (lastAcceptedPoint.current?.timestamp || trackingStartedAtRef.current || timestamp) > 10000) {
+        setErrorMessage('GPS signal is too weak to record a reliable route. Move outdoors and wait for accuracy to improve.');
+      }
       return;
     }
 
+    setErrorMessage(null);
     if (accuracy) setGpsAccuracy(Math.round(accuracy));
     setLastUpdateTime(new Date().toLocaleTimeString());
 
@@ -272,11 +271,11 @@ export function useLocationTracker() {
     if (isTrackingActive.current) return;
 
     setErrorMessage(null);
-    let permission = await Location.getForegroundPermissionsAsync();
+    let permission = await getLocationPermission();
     if (permission.status !== 'granted') {
       const granted = await requestPermissions();
       if (!granted) return;
-      permission = await Location.getForegroundPermissionsAsync();
+      permission = await getLocationPermission();
     }
     if (permission.status !== 'granted') {
       setErrorMessage('Location permission is required to record a real route.');
@@ -286,6 +285,7 @@ export function useLocationTracker() {
 
     isPausedRef.current = false;
     lastGpsSampleAtRef.current = Date.now();
+    trackingStartedAtRef.current = Date.now();
 
     // Start High-Accuracy Hardware GPS Watch
     try {
@@ -294,13 +294,23 @@ export function useLocationTracker() {
         locationSubscription.current = null;
       }
 
-      locationSubscription.current = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 2000,
-          distanceInterval: 2,
+      locationSubscription.current = watchLocation(
+        processLocationUpdate,
+        (error) => {
+          console.warn('GPS update error:', error);
+          isTrackingActive.current = false;
+          locationSubscription.current?.remove();
+          locationSubscription.current = null;
+          if (timerInterval.current) {
+            clearInterval(timerInterval.current);
+            timerInterval.current = null;
+          }
+          setStatus('error');
+          setErrorMessage(error.message || 'GPS stopped providing updates. Check that Precise location and device Location are enabled, then retry.');
         },
-        processLocationUpdate
+        true,
+        2,
+        2000,
       );
       isTrackingActive.current = true;
       setStatus('recording');

@@ -7,7 +7,7 @@ export const config = {
   host: process.env.HOST || '0.0.0.0',
   databaseUrl: process.env.DATABASE_URL || 'postgres://postgres:postgrespassword@localhost:5433/avfit_db',
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
-  // Gemini credentials belong only on the server; never read the Expo public env.
+  // Gemini credentials belong only on the server; never read them from the mobile app.
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   geminiModel: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
   geminiFallbackModel: process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.8-flash',

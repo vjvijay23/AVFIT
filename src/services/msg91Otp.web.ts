@@ -1,4 +1,5 @@
 import { getMsg91AccessToken } from './msg91AccessToken';
+import Config from 'react-native-config';
 
 type WidgetResult = { type?: string; message?: string; 'access-token'?: string; code?: string | number };
 type WidgetCallback = (result: WidgetResult) => void;
@@ -11,8 +12,8 @@ interface Msg91Window extends Window {
   isCaptchaVerified?: () => boolean;
 }
 
-const widgetId = process.env.EXPO_PUBLIC_MSG91_WEB_WIDGET_ID || process.env.EXPO_PUBLIC_MSG91_WIDGET_ID || '';
-const tokenAuth = process.env.EXPO_PUBLIC_MSG91_WEB_TOKEN_AUTH || process.env.EXPO_PUBLIC_MSG91_TOKEN_AUTH || '';
+const widgetId = Config.AVFIT_MSG91_WEB_WIDGET_ID || Config.AVFIT_MSG91_WIDGET_ID || '';
+const tokenAuth = Config.AVFIT_MSG91_WEB_TOKEN_AUTH || Config.AVFIT_MSG91_TOKEN_AUTH || '';
 const CAPTCHA_ELEMENT_ID = 'avfit-msg91-captcha';
 const requestIds = new Map<string, string>();
 let initializedWindow: Msg91Window | null = null;

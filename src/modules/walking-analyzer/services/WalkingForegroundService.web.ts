@@ -1,4 +1,3 @@
-import * as Location from 'expo-location';
 import { WalkingPoint, WalkingTelemetry, WalkingSummary, TrackerStatus, BackgroundServiceOptions } from '../types';
 import { filterAndComputeIncrementalDistance, formatElapsedSeconds, formatDistance, computePaceSecondsPerKm, formatPace, DEFAULT_FILTER_CONFIG } from './HaversineCalculator';
 
@@ -6,7 +5,7 @@ type TelemetryListener = (telemetry: WalkingTelemetry) => void;
 
 class WalkingForegroundServiceManager {
   private status: TrackerStatus = 'idle';
-  private subscription: Location.LocationSubscription | null = null;
+  private subscription: number | null = null;
   private listeners = new Set<TelemetryListener>();
   private routeCoordinates: WalkingPoint[] = [];
   private lastValidPoint: WalkingPoint | null = null;
@@ -60,23 +59,18 @@ class WalkingForegroundServiceManager {
     this.pauseStartTimestamp = null;
     this.pointsRejected = 0;
     this.maxSpeedMps = 0;
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== 'granted') {
-      this.status = 'error';
-      this.emit();
-      throw new Error('Location permission is required to record a walk.');
-    }
+    if (!navigator.geolocation) throw new Error('Location is not available in this browser.');
     this.startTimestamp = Date.now();
-    this.subscription = await Location.watchPositionAsync({
-      accuracy: Location.Accuracy.High,
-      distanceInterval: 3,
-      timeInterval: 1000,
-    }, (location) => this.onLocation(location));
+    this.subscription = navigator.geolocation.watchPosition(
+      (location) => this.onLocation(location),
+      (error) => { this.status = 'error'; this.emit(); console.warn('GPS update error:', error.message); },
+      { enableHighAccuracy: true, maximumAge: 0 },
+    );
     this.status = 'tracking';
     this.emit();
   }
 
-  private onLocation(location: Location.LocationObject) {
+  private onLocation(location: GeolocationPosition) {
     if (this.status !== 'tracking') return;
     const point: WalkingPoint = {
       latitude: location.coords.latitude,
@@ -116,7 +110,7 @@ class WalkingForegroundServiceManager {
 
   async finishTracking(): Promise<WalkingSummary> {
     const snapshot = this.getTelemetrySnapshot();
-    this.subscription?.remove();
+    if (this.subscription !== null) navigator.geolocation.clearWatch(this.subscription);
     this.subscription = null;
     this.status = 'finished';
     const endTime = Date.now();

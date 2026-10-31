@@ -27,7 +27,7 @@ export async function buildApp() {
     },
   });
 
-  // 1. CORS plugin for React Native / Expo development
+  // 1. CORS plugin for native React Native and approved web clients
   await fastify.register(cors, {
     origin: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

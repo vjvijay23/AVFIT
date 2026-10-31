@@ -63,7 +63,7 @@ export default function OtpVerificationScreen({
 
   // 60-second countdown timer for OTP resend
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (countdown > 0) {
       timer = setTimeout(() => {
         setCountdown((prev) => prev - 1);

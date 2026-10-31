@@ -7,7 +7,7 @@ This specification details the technical architecture and mobile user experience
 2. **Personalized Fitness Profile & Multi-Step Onboarding**
 3. **Gamified Achievements, Trophies & Milestone System**
 
-Built using **React Native (TypeScript, Expo SDK 51)**, **Supabase Auth & PostgreSQL**, and the established **Warm Cream / Forest Green editorial design system**.
+Built using **Bare React Native (TypeScript)**, **Supabase Auth & PostgreSQL**, and the established **Warm Cream / Forest Green editorial design system**.
 
 ---
 

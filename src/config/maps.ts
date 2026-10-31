@@ -1,7 +1,9 @@
+import Config from 'react-native-config';
+
 /**
  * Google Maps Configuration for AVFIT Outdoor Activity Tracking
  */
-export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+export const GOOGLE_MAPS_API_KEY = Config.AVFIT_GOOGLE_MAPS_API_KEY || '';
 
 export const MAP_CONFIG = {
   defaultLatitude: 37.7749,

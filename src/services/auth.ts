@@ -4,8 +4,10 @@ import { BackendApi } from './backendApi';
 import * as Msg91Otp from './msg91Otp';
 import { OTP_CODE_LENGTH } from './otpConfig';
 import { Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
-import * as LocalAuthentication from 'expo-local-authentication';
+import ReactNativeBiometrics from 'react-native-biometrics';
+import { SecureStorage } from './secureStorage';
+
+const biometrics = new ReactNativeBiometrics({ allowDeviceCredentials: false });
 
 export interface PendingSignupData {
   fullName: string;
@@ -20,6 +22,7 @@ export interface PendingSignupData {
 // Active session holder in memory (null by default so new sessions do not inherit another user's data)
 let currentActiveUserId: string | null = null;
 const BIOMETRIC_LOGIN_KEY = 'avfit.biometric-login-enabled';
+const BIOMETRIC_CREDENTIAL_KEY = 'avfit.biometric-login-credential';
 
 export const AuthService = {
   async restoreSession(): Promise<boolean> {
@@ -28,18 +31,11 @@ export const AuthService = {
     const biometricEnabled = await this.isBiometricLoginEnabled();
     if (biometricEnabled && Platform.OS !== 'web') {
       try {
-        const [hardware, enrolled] = await Promise.all([
-          LocalAuthentication.hasHardwareAsync(),
-          LocalAuthentication.isEnrolledAsync(),
-        ]);
-        if (!hardware || !enrolled) {
-          await SecureStore.deleteItemAsync(BIOMETRIC_LOGIN_KEY);
+        const sensor = await biometrics.isSensorAvailable();
+        if (!sensor.available) {
+          await SecureStorage.deleteItemAsync(BIOMETRIC_LOGIN_KEY);
         } else {
-          const result = await LocalAuthentication.authenticateAsync({
-            promptMessage: 'Unlock AVFIT',
-            cancelLabel: 'Use PIN',
-            disableDeviceFallback: true,
-          });
+          const result = await biometrics.simplePrompt({ promptMessage: 'Unlock AVFIT', cancelButtonText: 'Use PIN' });
           if (!result.success) {
             BackendApi.clearAuthToken();
             return false;
@@ -60,46 +56,36 @@ export const AuthService = {
   },
   async isBiometricLoginEnabled(): Promise<boolean> {
     if (Platform.OS === 'web') return false;
-    try { return (await SecureStore.getItemAsync(BIOMETRIC_LOGIN_KEY)) === 'true'; }
+    try { return (await SecureStorage.getItemAsync(BIOMETRIC_LOGIN_KEY)) === 'true'; }
     catch { return false; }
   },
-  async enableBiometricLogin(): Promise<void> {
+  async enableBiometricLogin(phone: string, pin: string): Promise<void> {
     if (Platform.OS === 'web') throw new Error('Device biometrics are available in the Android and iOS app only.');
-    const [hardware, enrolled] = await Promise.all([
-      LocalAuthentication.hasHardwareAsync(),
-      LocalAuthentication.isEnrolledAsync(),
-    ]);
-    if (!hardware || !enrolled) throw new Error('Set up a fingerprint or face unlock in your device settings first.');
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Confirm biometrics for AVFIT sign-in',
-      cancelLabel: 'Cancel',
-      disableDeviceFallback: true,
-    });
+    if (!/^\d{4}$/.test(pin)) throw new Error('Enter your current four-digit PIN to enable biometric sign-in.');
+    const sensor = await biometrics.isSensorAvailable();
+    if (!sensor.available) throw new Error('Set up a fingerprint or face unlock in your device settings first.');
+    const result = await biometrics.simplePrompt({ promptMessage: 'Confirm biometrics for AVFIT sign-in', cancelButtonText: 'Cancel' });
     if (!result.success) throw new Error('Biometric confirmation was not completed.');
-    await SecureStore.setItemAsync(BIOMETRIC_LOGIN_KEY, 'true');
+    // Verify the PIN with the server before placing the credentials in a
+    // hardware-backed, biometric-gated keychain entry.
+    await BackendApi.loginWithPin(phone, pin);
+    await SecureStorage.setBiometricSecret(BIOMETRIC_CREDENTIAL_KEY, phone, pin);
+    await SecureStorage.setItemAsync(BIOMETRIC_LOGIN_KEY, 'true');
   },
   async disableBiometricLogin(): Promise<void> {
-    if (Platform.OS !== 'web') await SecureStore.deleteItemAsync(BIOMETRIC_LOGIN_KEY);
+    if (Platform.OS !== 'web') {
+      await SecureStorage.deleteItemAsync(BIOMETRIC_CREDENTIAL_KEY).catch(() => undefined);
+      await SecureStorage.deleteItemAsync(BIOMETRIC_LOGIN_KEY);
+    }
   },
   async signInWithBiometrics(): Promise<boolean> {
     if (Platform.OS === 'web' || !(await this.isBiometricLoginEnabled())) return false;
-    const userId = await BackendApi.restoreAuthSession();
-    if (!userId) return false;
-    const [hardware, enrolled] = await Promise.all([
-      LocalAuthentication.hasHardwareAsync(),
-      LocalAuthentication.isEnrolledAsync(),
-    ]);
-    if (!hardware || !enrolled) { BackendApi.clearAuthToken(); return false; }
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Unlock AVFIT',
-      cancelLabel: 'Use PIN',
-      disableDeviceFallback: true,
-    });
-    if (!result.success) {
-      BackendApi.clearAuthToken();
-      return false;
-    }
-    currentActiveUserId = userId;
+    const sensor = await biometrics.isSensorAvailable();
+    if (!sensor.available) return false;
+    const credentials = await SecureStorage.getBiometricSecret(BIOMETRIC_CREDENTIAL_KEY);
+    if (!credentials || !/^\d{4}$/.test(credentials.password)) return false;
+    const result = await BackendApi.loginWithPin(credentials.username, credentials.password);
+    currentActiveUserId = String(result.user.id);
     return true;
   },
   /**
@@ -283,7 +269,6 @@ export const AuthService = {
   async signOut(): Promise<void> {
     currentActiveUserId = null;
     await BackendApi.signOut();
-    if (Platform.OS !== 'web') await SecureStore.deleteItemAsync(BIOMETRIC_LOGIN_KEY).catch(() => undefined);
   },
 };
 

@@ -99,8 +99,8 @@ All routes below that change or expose personal data require `Authorization: Bea
 
 ## Local setup
 
-1. In `backend`, copy `.env.example` to `.env` and set `MSG91_AUTHKEY` to the Authkey for the same MSG91 account that owns the client widget. The mobile build needs `EXPO_PUBLIC_MSG91_MOBILE_WIDGET_ID` and `EXPO_PUBLIC_MSG91_MOBILE_TOKEN_AUTH`; the web build needs `EXPO_PUBLIC_MSG91_WEB_WIDGET_ID` and `EXPO_PUBLIC_MSG91_WEB_TOKEN_AUTH` (the shared widget variables are also accepted). The widget must allow the matching client platform and use a six-digit code.
-2. Set `GEMINI_API_KEY` in the backend environment for food photo analysis and diet-plan generation. Never put it in an `EXPO_PUBLIC_*` variable or mobile app.
+1. In `backend`, copy `.env.example` to `.env` and set `MSG91_AUTHKEY` to the Authkey for the same MSG91 account that owns the client widget. The Android app reads `AVFIT_MSG91_MOBILE_WIDGET_ID` and `AVFIT_MSG91_MOBILE_TOKEN_AUTH` from the app's `.env`; the optional web client reads `AVFIT_MSG91_WEB_WIDGET_ID` and `AVFIT_MSG91_WEB_TOKEN_AUTH`. The widget must allow the matching client platform and use a six-digit code.
+2. Set `GEMINI_API_KEY` in the backend environment for food photo analysis and diet-plan generation. Never put it in the mobile app's `.env` or APK.
 3. Run `npm ci`.
 4. Run `docker compose up -d` to start PostgreSQL/PostGIS and Redis.
 5. Run `npm run dev`. Startup applies the schema. It does not create demo user records.
