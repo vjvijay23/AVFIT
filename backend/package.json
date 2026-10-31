@@ -9,7 +9,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "db:migrate": "tsx src/db/migrate.ts",
-    "test:mock": "node --import tsx --test test/api.mock.test.ts"
+    "test:mock": "node --import tsx --test test/api.mock.test.ts test/vision.scanner.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",

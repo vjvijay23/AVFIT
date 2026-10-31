@@ -31,6 +31,7 @@ export async function buildApp() {
   await fastify.register(cors, {
     origin: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    exposedHeaders: ['Server-Timing'],
   });
 
   // 2. JWT Plugin

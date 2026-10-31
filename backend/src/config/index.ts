@@ -9,8 +9,11 @@ export const config = {
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   // Gemini credentials belong only on the server; never read the Expo public env.
   geminiApiKey: process.env.GEMINI_API_KEY || '',
-  geminiModel: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
-  geminiFallbackModel: process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash-lite',
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
+  geminiFallbackModel: process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.8-flash',
+  geminiPrimaryTimeoutMs: Math.max(1000, Number(process.env.GEMINI_PRIMARY_TIMEOUT_MS) || 12000),
+  geminiFallbackTimeoutMs: Math.max(1000, Number(process.env.GEMINI_FALLBACK_TIMEOUT_MS) || 9000),
+  geminiTotalTimeoutMs: Math.max(2000, Number(process.env.GEMINI_TOTAL_TIMEOUT_MS) || 22000),
   jwtSecret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-only-change-me'),
   msg91AuthKey: process.env.MSG91_AUTHKEY || '',
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,19 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
 import { Colors } from '../theme/colors';
 import { FoodNutritionEstimate } from '../types';
 import { ActivityService } from '../services/activityService';
 import { AuthService } from '../services/auth';
 import { BackendApi } from '../services/backendApi';
+import { adjustNutritionPortion } from '../services/foodNutrition';
+import { getFoodImageTransform } from '../services/foodImageGeometry';
 import {
   Camera as CameraIcon,
   Sparkles,
@@ -32,9 +37,54 @@ import {
 const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'] as const;
 type MealCategory = (typeof MEAL_CATEGORIES)[number];
 
+type PreparedFoodImage = { uri: string; base64: string; mimeType: 'image/jpeg'; width: number; height: number };
+
+async function prepareFoodImage(asset: ImagePicker.ImagePickerAsset): Promise<PreparedFoodImage> {
+  const imageStarted = performance.now();
+  const sourceWidth = Math.max(1, asset.width || 1024);
+  const sourceHeight = Math.max(1, asset.height || 768);
+  const { crop, resizeWidth } = getFoodImageTransform(sourceWidth, sourceHeight);
+  const cropActions: ImageManipulator.Action[] = [{ crop }, { resize: { width: resizeWidth } }];
+
+  // ImageManipulator uses the native image pipeline, keeping full-resolution
+  // decode, crop, resize, and JPEG compression off the React Native JS thread.
+  const manipulated = await ImageManipulator.manipulateAsync(asset.uri, cropActions, {
+    compress: 0.65,
+    format: ImageManipulator.SaveFormat.JPEG,
+    // On web, FileSystem's native Base64 reader is not available. Android reads
+    // the already-compressed JPEG asynchronously in a separate measured step.
+    base64: Platform.OS === 'web',
+  });
+  const imageProcessingMs = performance.now() - imageStarted;
+
+  const base64Started = performance.now();
+  const base64 = manipulated.base64 || await FileSystem.readAsStringAsync(manipulated.uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  const base64EncodingMs = performance.now() - base64Started;
+  if (!base64) throw new Error('The selected image could not be encoded. Please choose another photo.');
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+
+  console.info('[FoodScan] Image prepared', {
+    imageProcessingMs: Math.round(imageProcessingMs),
+    base64EncodingMs: Math.round(base64EncodingMs),
+    width: manipulated.width,
+    height: manipulated.height,
+    compressedBytes: Math.floor(base64.length * 3 / 4) - padding,
+    base64EncodingIncludedInImageProcessing: Platform.OS === 'web',
+  });
+  return { uri: manipulated.uri, base64, mimeType: 'image/jpeg', width: manipulated.width, height: manipulated.height };
+}
+
+function nextFrame() {
+  return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 export default function FoodScannerScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const [isScanning, setIsScanning] = useState(false);
+  const [scanStage, setScanStage] = useState('');
+  const scanInFlight = useRef(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<MealCategory>('Lunch');
   const [portionGrams, setPortionGrams] = useState(350);
@@ -71,23 +121,9 @@ export default function FoodScannerScreen({ navigation }: any) {
   const handleAdjustPortion = (delta: number) => {
     if (!scannedResult) return;
     const newWeight = Math.max(50, portionGrams + delta);
-    const previous = scannedResult;
-    const ratio = newWeight / Math.max(previous.estimated_weight_g, 1);
     setPortionGrams(newWeight);
     setIsSaved(false);
-    setScannedResult({
-      ...previous,
-      estimated_weight_g: newWeight,
-      calories: Math.round(previous.calories * ratio),
-      protein_g: Math.round(previous.protein_g * ratio * 10) / 10,
-      carbs_g: Math.round(previous.carbs_g * ratio * 10) / 10,
-      fat_g: Math.round(previous.fat_g * ratio * 10) / 10,
-      fiber_g: Math.round(previous.fiber_g * ratio * 10) / 10,
-      sugars_g: Math.round((previous.sugars_g || 0) * ratio * 10) / 10,
-      saturated_fat_g: Math.round((previous.saturated_fat_g || 0) * ratio * 10) / 10,
-      sodium_mg: Math.round((previous.sodium_mg || 0) * ratio * 10) / 10,
-      cholesterol_mg: Math.round((previous.cholesterol_mg || 0) * ratio * 10) / 10,
-    });
+    setScannedResult(adjustNutritionPortion(scannedResult, newWeight));
   };
 
   const handlePickImage = async () => {
@@ -97,9 +133,10 @@ export default function FoodScannerScreen({ navigation }: any) {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        // Smaller JPEGs upload faster on mobile data while retaining enough detail for meal estimates.
-        quality: 0.55,
-        base64: true,
+        // Crop in the picker; resize/compress and encode only once in the native
+        // image pipeline after selection.
+        quality: 1,
+        base64: false,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -122,8 +159,8 @@ export default function FoodScannerScreen({ navigation }: any) {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.55,
-        base64: true,
+        quality: 1,
+        base64: false,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -136,18 +173,31 @@ export default function FoodScannerScreen({ navigation }: any) {
   };
 
   const runFoodScan = async (asset: ImagePicker.ImagePickerAsset) => {
+    if (scanInFlight.current) return;
+    scanInFlight.current = true;
     setIsScanning(true);
+    setScanStage('Preparing a 4:3 food photo…');
     setIsSaved(false);
     setMealId(null);
     setScannedResult(null);
     try {
-      if (!asset.base64) throw new Error('The selected image could not be encoded. Please choose another photo.');
-      const result = await BackendApi.scanFood(asset.base64, asset.mimeType || 'image/jpeg');
+      await nextFrame();
+      const prepared = await prepareFoodImage(asset);
+      setSelectedImageUri(prepared.uri);
+      setScanStage('Uploading the compressed photo securely…');
+      await nextFrame();
+      const result = await BackendApi.scanFood(prepared.base64, prepared.mimeType, () => {
+        setScanStage('Sending photo and analyzing nutrition…');
+      });
+      setScanStage('Preparing nutrition results…');
+      await nextFrame();
       setScannedResult(result);
       setPortionGrams(result.estimated_weight_g);
       setMealId(result.mealId || null);
     } finally {
+      scanInFlight.current = false;
       setIsScanning(false);
+      setScanStage('');
     }
   };
 
@@ -166,6 +216,9 @@ export default function FoodScannerScreen({ navigation }: any) {
         saturatedFatG: scannedResult.saturated_fat_g,
         sodiumMg: scannedResult.sodium_mg,
         cholesterolMg: scannedResult.cholesterol_mg,
+        confidence: scannedResult.confidence,
+        healthTips: scannedResult.health_tips,
+        ingredients: scannedResult.ingredients,
         mealType: selectedCategory.toLowerCase(),
       };
       if (mealId) await BackendApi.updateMeal(mealId, meal);
@@ -240,19 +293,19 @@ export default function FoodScannerScreen({ navigation }: any) {
           {isScanning && (
             <View style={styles.scanningOverlay}>
               <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={styles.scanningText}>Analyzing nutrition with AI Vision...</Text>
+              <Text style={styles.scanningText}>{scanStage || 'Analyzing nutrition with AI Vision…'}</Text>
             </View>
           )}
         </View>
 
         {/* Camera & Gallery Action Buttons */}
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.captureBtn} onPress={handleCaptureImage} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.captureBtn} onPress={handleCaptureImage} activeOpacity={0.8} disabled={isScanning}>
             <CameraIcon size={16} color="#FFFFFF" />
             <Text style={styles.captureBtnText}>Scan with Camera</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.galleryBtn} onPress={handlePickImage} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.galleryBtn} onPress={handlePickImage} activeOpacity={0.8} disabled={isScanning}>
             <ImageIcon size={16} color={Colors.textPrimary} />
             <Text style={styles.galleryBtnText}>Select Photo</Text>
           </TouchableOpacity>

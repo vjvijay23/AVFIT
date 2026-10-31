@@ -20,13 +20,19 @@ async function saveAuthSession(session: SavedAuthSession | null): Promise<void> 
   }
 }
 
-type RequestOptions = RequestInit & { authenticated?: boolean };
+type RequestOptions = RequestInit & {
+  authenticated?: boolean;
+  onRequestStart?: () => void;
+  onResponse?: (response: Response) => void;
+};
 
 async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { authenticated = true, headers, ...init } = options;
+  const { authenticated = true, headers, onRequestStart, onResponse, ...init } = options;
   const requestHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...(headers as Record<string, string> | undefined) };
   if (authenticated && authToken) requestHeaders.Authorization = `Bearer ${authToken}`;
+  onRequestStart?.();
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers: requestHeaders });
+  onResponse?.(response);
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body?.error || `Backend request failed (${response.status})`);
   return body as T;
@@ -84,11 +90,50 @@ export const BackendApi = {
   getActivity(id: string) {
     return apiRequest<{ success: boolean; activity: Record<string, any> }>(`/activities/${encodeURIComponent(id)}`);
   },
-  async scanFood(imageBase64: string, mimeType = 'image/jpeg'): Promise<FoodNutritionEstimate & { mealId?: string; cached?: boolean }> {
-    const result = await apiRequest<{ success: boolean; data: FoodNutritionEstimate & { mealId?: string; cached?: boolean } }>('/vision/scan-food', {
-      method: 'POST', body: JSON.stringify({ imageBase64, mimeType }),
-    });
-    return result.data;
+  async scanFood(
+    imageBase64: string,
+    mimeType = 'image/jpeg',
+    onRequestStart?: () => void,
+  ): Promise<FoodNutritionEstimate & { mealId?: string; cached?: boolean }> {
+    const serializationStartedAt = performance.now();
+    const body = JSON.stringify({ imageBase64, mimeType });
+    const requestJsonSerializationMs = performance.now() - serializationStartedAt;
+    const startedAt = performance.now();
+    const controller = new AbortController();
+    const requestDeadline = setTimeout(() => controller.abort(), 60_000);
+    let status: number | undefined;
+    const responseMetrics: { serverTiming: string | null } = { serverTiming: null };
+    let cacheState = 'unknown';
+    try {
+      const result = await apiRequest<{ success: boolean; data: FoodNutritionEstimate & { mealId?: string; cached?: boolean } }>('/vision/scan-food', {
+        method: 'POST',
+        body,
+        signal: controller.signal,
+        onRequestStart,
+        onResponse: (response) => {
+          status = response.status;
+          responseMetrics.serverTiming = response.headers.get('Server-Timing');
+        },
+      });
+      cacheState = result.data.cached ? 'hit-or-coalesced' : 'miss';
+      return result.data;
+    } catch (error: any) {
+      if (controller.signal.aborted) throw new Error('The food scan request timed out. Check your connection and try again.');
+      throw error;
+    } finally {
+      clearTimeout(requestDeadline);
+      const apiRoundTripMs = performance.now() - startedAt;
+      const serverTotalMs = Number(responseMetrics.serverTiming?.match(/server-total;dur=([\d.]+)/)?.[1]);
+      console.info('[FoodScan] API round trip', {
+        apiRoundTripMs: Math.round(apiRoundTripMs),
+        requestJsonSerializationMs: Math.round(requestJsonSerializationMs),
+        clientToServerResidualMs: Number.isFinite(serverTotalMs) ? Math.max(0, Math.round(apiRoundTripMs - serverTotalMs)) : undefined,
+        serverTotalMs: Number.isFinite(serverTotalMs) ? Math.round(serverTotalMs) : undefined,
+        status,
+        cacheState,
+        serverTiming: responseMetrics.serverTiming,
+      });
+    }
   },
   generateDietPlan(focus?: string) {
     return apiRequest<{ success: boolean; plan: Record<string, any> }>('/diet-plans/generate', { method: 'POST', body: JSON.stringify({ focus }) });
@@ -96,10 +141,10 @@ export const BackendApi = {
   getLatestDietPlan() {
     return apiRequest<{ success: boolean; plan: Record<string, any> | null }>('/diet-plans/latest');
   },
-  updateMeal(id: string, meal: { dishName?: string; portionGrams?: number; calories?: number; proteinG?: number; carbsG?: number; fatG?: number; fiberG?: number; sugarsG?: number; saturatedFatG?: number; sodiumMg?: number; cholesterolMg?: number; mealType?: string }) {
+  updateMeal(id: string, meal: { dishName?: string; portionGrams?: number; calories?: number; proteinG?: number; carbsG?: number; fatG?: number; fiberG?: number; sugarsG?: number; saturatedFatG?: number; sodiumMg?: number; cholesterolMg?: number; confidence?: string; healthTips?: string; ingredients?: Array<{ name: string; weight_g: number; calories: number }>; mealType?: string }) {
     return apiRequest(`/meals/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(meal) });
   },
-  createMeal(meal: { dishName: string; portionGrams: number; calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarsG?: number; saturatedFatG?: number; sodiumMg?: number; cholesterolMg?: number; mealType: string }) {
+  createMeal(meal: { dishName: string; portionGrams: number; calories: number; proteinG: number; carbsG: number; fatG: number; fiberG: number; sugarsG?: number; saturatedFatG?: number; sodiumMg?: number; cholesterolMg?: number; confidence?: string; healthTips?: string; ingredients?: Array<{ name: string; weight_g: number; calories: number }>; mealType: string }) {
     return apiRequest('/meals', { method: 'POST', body: JSON.stringify(meal) });
   },
   getMeals(date?: string) {
