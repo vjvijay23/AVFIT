@@ -10,6 +10,7 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { Colors } from '../../theme/colors';
 import { GPSPoint } from '../../types';
+import { MAP_CONFIG } from '../../config/maps';
 import { Navigation, Compass, Layers, Maximize2 } from 'lucide-react-native';
 import InbuiltRouteMap from './InbuiltRouteMap';
 
@@ -38,12 +39,8 @@ export default function GoogleActivityMap({
 
   // Initial region centered on current location or start of route coordinates
   const initialRegion: Region = {
-    latitude:
-      currentLocation?.latitude ||
-      (routeCoordinates.length > 0 ? routeCoordinates[0].latitude : 0),
-    longitude:
-      currentLocation?.longitude ||
-      (routeCoordinates.length > 0 ? routeCoordinates[0].longitude : 0),
+    latitude: currentLocation?.latitude ?? routeCoordinates[0]?.latitude ?? MAP_CONFIG.defaultLatitude,
+    longitude: currentLocation?.longitude ?? routeCoordinates[0]?.longitude ?? MAP_CONFIG.defaultLongitude,
     latitudeDelta: 0.006,
     longitudeDelta: 0.006,
   };
@@ -101,17 +98,6 @@ export default function GoogleActivityMap({
     }
     if (onRecenter) onRecenter();
   }, [currentLocation, onRecenter]);
-
-  // Avoid showing a fabricated default region (San Francisco) while the device has no GPS fix.
-  if (!currentLocation && routeCoordinates.length === 0) {
-    return (
-      <View style={[styles.container, { height: height as any }, styles.waitingForGps]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Waiting for your GPS location…</Text>
-        <Text style={styles.loadingSub}>The map and route will appear when the device reports a real location.</Text>
-      </View>
-    );
-  }
 
   // Render fallback map if native Google Maps encounters an environment issue
   if (hasMapError) {
@@ -225,15 +211,11 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(249, 246, 240, 0.92)',
+    // Keep the map visible during GPS acquisition so the screen never looks blank.
+    backgroundColor: 'rgba(249, 246, 240, 0.52)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
-    padding: 24,
-  },
-  waitingForGps: {
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 24,
   },
   loadingText: {

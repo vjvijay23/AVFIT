@@ -115,8 +115,8 @@ android {
         applicationId 'com.avfit.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 18
-        versionName "1.1.6"
+        versionCode 19
+        versionName "1.1.7"
         manifestPlaceholders = [googleMapsApiKey: project.env.get("AVFIT_GOOGLE_MAPS_API_KEY", "")]
     }
     signingConfigs {
