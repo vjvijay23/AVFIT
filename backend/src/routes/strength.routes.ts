@@ -88,6 +88,46 @@ export async function strengthRoutes(app: FastifyInstance) {
     return { success: true, workouts: result.rows };
   });
 
+  app.get<{ Params: { workoutId: string } }>('/workouts/:workoutId', { preHandler: requireAuth }, async (request, reply) => {
+    const workoutId = request.params.workoutId;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workoutId)) {
+      return reply.status(400).send({ error: 'Invalid strength workout ID.' });
+    }
+
+    const workoutResult = await pool.query(
+      `SELECT id, name, started_at AS "startedAt", completed_at AS "completedAt",
+              duration_seconds AS "durationSeconds", total_volume_kg AS "totalVolumeKg",
+              calories_burned AS "caloriesBurned"
+       FROM strength_workouts
+       WHERE id=$1 AND user_id=$2`,
+      [workoutId, authenticatedUserId(request)],
+    );
+    if (!workoutResult.rows.length) return reply.status(404).send({ error: 'Strength workout not found.' });
+
+    const exercisesResult = await pool.query(
+      `SELECT swe.id, swe.exercise_id AS "exerciseId", swe.exercise_name AS name,
+              se.primary_muscle AS "primaryMuscle", se.equipment,
+              COALESCE(json_agg(json_build_object(
+                'setIndex', ss.set_index,
+                'setType', ss.set_type,
+                'weightKg', ss.weight_kg,
+                'reps', ss.reps,
+                'rpe', ss.rpe,
+                'isCompleted', ss.is_completed,
+                'isPersonalRecord', ss.is_pr
+              ) ORDER BY ss.set_index) FILTER (WHERE ss.id IS NOT NULL), '[]'::json) AS sets
+       FROM strength_workout_exercises swe
+       JOIN strength_exercises se ON se.id=swe.exercise_id
+       LEFT JOIN strength_sets ss ON ss.workout_exercise_id=swe.id
+       WHERE swe.workout_id=$1
+       GROUP BY swe.id, swe.exercise_id, swe.exercise_name, se.primary_muscle, se.equipment, swe.order_index
+       ORDER BY swe.order_index`,
+      [workoutId],
+    );
+
+    return { success: true, workout: { ...workoutResult.rows[0], exercises: exercisesResult.rows } };
+  });
+
   app.post('/workouts', { preHandler: requireAuth }, async (request, reply) => {
     const parsed = workoutSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'Invalid strength workout.', details: parsed.error.flatten() });
