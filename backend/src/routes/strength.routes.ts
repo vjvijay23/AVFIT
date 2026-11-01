@@ -29,7 +29,7 @@ type Bests = { estimated1rm: number; volume: number; weight: number };
 export async function strengthRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { equipment?: string } }>('/exercises', async (request, reply) => {
     const equipment = request.query.equipment;
-    if (equipment && !['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'].includes(equipment)) {
+    if (equipment && !['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight', 'kettlebell', 'smith_machine', 'resistance_band', 'ez_bar', 'trap_bar', 'medicine_ball', 'suspension_trainer', 'landmine'].includes(equipment)) {
       return reply.status(400).send({ error: 'Unsupported equipment filter.' });
     }
     const result = await pool.query(
