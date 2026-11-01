@@ -172,6 +172,78 @@ CREATE TABLE IF NOT EXISTS workout_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_workout_logs_user_date ON workout_logs(user_id, completed_at DESC);
 
+-- Set-by-set strength training records. These extend the existing workout log
+-- without changing how guided workout summaries are stored.
+CREATE TABLE IF NOT EXISTS strength_exercises (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    slug TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    equipment TEXT NOT NULL CHECK (equipment IN ('barbell','dumbbell','machine','cable','bodyweight')),
+    primary_muscle TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS strength_workouts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    workout_log_id UUID REFERENCES workout_logs(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL,
+    completed_at TIMESTAMPTZ NOT NULL,
+    duration_seconds INT NOT NULL CHECK (duration_seconds BETWEEN 30 AND 86400),
+    total_volume_kg NUMERIC(12,2) NOT NULL DEFAULT 0,
+    calories_burned INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_strength_workouts_user_date ON strength_workouts(user_id, completed_at DESC);
+CREATE TABLE IF NOT EXISTS strength_workout_exercises (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workout_id UUID NOT NULL REFERENCES strength_workouts(id) ON DELETE CASCADE,
+    exercise_id UUID NOT NULL REFERENCES strength_exercises(id),
+    exercise_name TEXT NOT NULL,
+    order_index INT NOT NULL CHECK (order_index >= 0),
+    UNIQUE (workout_id, order_index)
+);
+CREATE TABLE IF NOT EXISTS strength_sets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workout_exercise_id UUID NOT NULL REFERENCES strength_workout_exercises(id) ON DELETE CASCADE,
+    set_index INT NOT NULL CHECK (set_index > 0),
+    set_type TEXT NOT NULL DEFAULT 'N' CHECK (set_type IN ('W','N','D','F')),
+    weight_kg NUMERIC(8,2) NOT NULL DEFAULT 0 CHECK (weight_kg >= 0),
+    reps INT NOT NULL CHECK (reps BETWEEN 0 AND 1000),
+    rpe NUMERIC(3,1) CHECK (rpe BETWEEN 6 AND 10),
+    is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+    volume_kg NUMERIC(12,2) NOT NULL DEFAULT 0,
+    estimated_1rm_kg NUMERIC(10,2),
+    is_pr BOOLEAN NOT NULL DEFAULT FALSE,
+    UNIQUE (workout_exercise_id, set_index)
+);
+CREATE INDEX IF NOT EXISTS idx_strength_sets_previous ON strength_sets(workout_exercise_id, set_index);
+
+INSERT INTO strength_exercises (id,slug,name,equipment,primary_muscle) VALUES
+ ('00000000-0000-4000-8000-000000000001','barbell-back-squat','Barbell Back Squat','barbell','quads'),
+ ('00000000-0000-4000-8000-000000000002','barbell-deadlift','Barbell Deadlift','barbell','back'),
+ ('00000000-0000-4000-8000-000000000003','barbell-bench-press','Barbell Bench Press','barbell','chest'),
+ ('00000000-0000-4000-8000-000000000004','barbell-overhead-press','Barbell Overhead Press','barbell','shoulders'),
+ ('00000000-0000-4000-8000-000000000005','barbell-row','Barbell Row','barbell','back'),
+ ('00000000-0000-4000-8000-000000000006','dumbbell-goblet-squat','Dumbbell Goblet Squat','dumbbell','quads'),
+ ('00000000-0000-4000-8000-000000000007','dumbbell-chest-press','Dumbbell Chest Press','dumbbell','chest'),
+ ('00000000-0000-4000-8000-000000000008','dumbbell-shoulder-press','Dumbbell Shoulder Press','dumbbell','shoulders'),
+ ('00000000-0000-4000-8000-000000000009','dumbbell-row','Dumbbell Row','dumbbell','back'),
+ ('00000000-0000-4000-8000-000000000010','dumbbell-bicep-curl','Dumbbell Bicep Curl','dumbbell','biceps'),
+ ('00000000-0000-4000-8000-000000000011','leg-press','Leg Press','machine','quads'),
+ ('00000000-0000-4000-8000-000000000012','leg-extension','Leg Extension','machine','quads'),
+ ('00000000-0000-4000-8000-000000000013','seated-row','Seated Cable Row','machine','back'),
+ ('00000000-0000-4000-8000-000000000014','chest-fly-machine','Chest Fly Machine','machine','chest'),
+ ('00000000-0000-4000-8000-000000000015','lat-pulldown','Lat Pulldown','cable','back'),
+ ('00000000-0000-4000-8000-000000000016','cable-triceps-pushdown','Cable Triceps Pushdown','cable','triceps'),
+ ('00000000-0000-4000-8000-000000000017','cable-face-pull','Cable Face Pull','cable','shoulders'),
+ ('00000000-0000-4000-8000-000000000018','cable-lateral-raise','Cable Lateral Raise','cable','shoulders'),
+ ('00000000-0000-4000-8000-000000000019','push-up','Push-Up','bodyweight','chest'),
+ ('00000000-0000-4000-8000-000000000020','pull-up','Pull-Up','bodyweight','back'),
+ ('00000000-0000-4000-8000-000000000021','bodyweight-squat','Bodyweight Squat','bodyweight','quads'),
+ ('00000000-0000-4000-8000-000000000022','plank','Plank','bodyweight','core')
+ON CONFLICT (slug) DO NOTHING;
+
 -- Achievement catalog and per-user progress. Progress is only written by backend services.
 CREATE TABLE IF NOT EXISTS achievement_definitions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
