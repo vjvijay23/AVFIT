@@ -1,3 +1,4 @@
+import { useTheme, useThemeStyles } from '../../theme/ThemeContext';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -30,6 +31,7 @@ import { AuthService } from '../../services/auth';
 import { BackendApi } from '../../services/backendApi';
 import DateOfBirthPicker from '../../components/common/DateOfBirthPicker';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
+import HealthConnectionsCard from '../../components/profile/HealthConnectionsCard';
 import { launchImageLibrary } from 'react-native-image-picker';
 import {
   User,
@@ -43,6 +45,10 @@ import {
   Check,
   LogOut,
   Camera,
+  Sun,
+  Moon,
+  Trophy,
+  ChevronRight,
 } from 'lucide-react-native';
 
 interface ProfileEditScreenProps {
@@ -57,6 +63,7 @@ interface ProfileFormSnapshot {
   heightCm: string;
   weightKg: string;
   targetWeightKg: string;
+  goalTimelineMonths: number;
   fitnessGoal: FitnessGoal;
   activityLevel: ActivityLevel;
   workoutPreference: WorkoutPreference;
@@ -72,6 +79,8 @@ interface ProfileFormSnapshot {
 }
 
 export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEditScreenProps) {
+  const styles = useThemeStyles(createStyles);
+  const { mode, preference, setPreference } = useTheme();
   const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -93,6 +102,7 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
   const [heightCm, setHeightCm] = useState('178');
   const [weightKg, setWeightKg] = useState('74');
   const [targetWeightKg, setTargetWeightKg] = useState('71');
+  const [goalTimelineMonths, setGoalTimelineMonths] = useState(3);
   const [fitnessGoal, setFitnessGoal] = useState<FitnessGoal>('weight_loss');
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>('moderately_active');
   const [workoutPreference, setWorkoutPreference] = useState<WorkoutPreference>('combination');
@@ -132,6 +142,7 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
         setHeightCm(fitness.heightCm.toString());
         setWeightKg(fitness.weightKg.toString());
         setTargetWeightKg(fitness.targetWeightKg?.toString() || '');
+        setGoalTimelineMonths(fitness.goalTimelineMonths || 3);
         setFitnessGoal(fitness.fitnessGoal);
         setActivityLevel(fitness.activityLevel);
         setWorkoutPreference(fitness.workoutPreference);
@@ -154,7 +165,7 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
   }, []);
 
   const captureForm = (): ProfileFormSnapshot => ({
-    fullName, dateOfBirth, gender, heightCm, weightKg, targetWeightKg,
+    fullName, dateOfBirth, gender, heightCm, weightKg, targetWeightKg, goalTimelineMonths,
     fitnessGoal, activityLevel, workoutPreference, dietaryPreference,
     dietaryPreferenceOther, allergies, customAllergiesAndRestrictions,
     fitnessLevel, availableEquipment, preferredDurationMin, weeklyFrequencyDays, isPrivate,
@@ -170,6 +181,7 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
     if (!Number.isFinite(height) || height < 80 || height > 250) return 'Enter a height between 80 and 250 cm.';
     if (!Number.isFinite(weight) || weight < 25 || weight > 350) return 'Enter a weight between 25 and 350 kg.';
     if (target !== undefined && (!Number.isFinite(target) || target < 25 || target > 350)) return 'Enter a target weight between 25 and 350 kg.';
+    if (!Number.isInteger(form.goalTimelineMonths) || form.goalTimelineMonths < 1 || form.goalTimelineMonths > 24) return 'Choose a goal timeline between 1 and 24 months.';
     if (form.dietaryPreference === 'other' && !form.dietaryPreferenceOther.trim()) return 'Describe your other dietary preference.';
     if (form.allergies.includes('other') && !form.customAllergiesAndRestrictions.trim()) return 'Describe your other allergy or restriction.';
     return null;
@@ -190,6 +202,7 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
         heightCm: Number(form.heightCm),
         weightKg: Number(form.weightKg),
         targetWeightKg: form.targetWeightKg.trim() ? Number(form.targetWeightKg) : undefined,
+        goalTimelineMonths: form.goalTimelineMonths,
         fitnessGoal: form.fitnessGoal,
         fitnessLevel: form.fitnessLevel,
         activityLevel: form.activityLevel,
@@ -412,17 +425,63 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.photoCard}>
-          <ProfileAvatar userId={AuthService.getActiveUserId()} hasPhoto={hasProfilePhoto} photoUpdatedAt={photoUpdatedAt} emoji="🏃‍♂️" size={76} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.photoTitle}>Your profile photo</Text>
-            <Text style={styles.photoHint}>Stored privately with your AVFIT account.</Text>
+        <View style={styles.profileIntro}>
+          <View style={styles.profileAvatarWrap}>
+            <ProfileAvatar userId={AuthService.getActiveUserId()} hasPhoto={hasProfilePhoto} photoUpdatedAt={photoUpdatedAt} size={72} />
+            <TouchableOpacity
+              style={styles.profilePhotoEditButton}
+              onPress={handlePickProfilePhoto}
+              disabled={photoLoading}
+              accessibilityRole="button"
+              accessibilityLabel={hasProfilePhoto ? 'Change profile photo' : 'Add profile photo'}
+            >
+              {photoLoading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Camera size={14} color="#FFFFFF" />}
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.photoButton} onPress={handlePickProfilePhoto} disabled={photoLoading}>
-            {photoLoading ? <ActivityIndicator color="#fff" size="small" /> : <><Camera size={16} color="#fff" /><Text style={styles.photoButtonText}>{hasProfilePhoto ? 'Change' : 'Upload'}</Text></>}
-          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.profileIntroEyebrow}>YOUR AVFIT PROFILE</Text>
+            <Text style={styles.profileIntroName} numberOfLines={1}>{fullName || 'Athlete'}</Text>
+            <Text style={styles.profileIntroSub}>Personal details, goals and health connections</Text>
+          </View>
         </View>
+        <TouchableOpacity
+          style={[styles.card, { flexDirection: 'row', alignItems: 'center', marginBottom: 14 }]}
+          onPress={() => navigation?.navigate?.('Achievements')}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Your Achievements. Open trophies and badges."
+        >
+          <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+            <Trophy size={20} color={Colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionHeading}>Your Achievements</Text>
+            <Text style={{ color: Colors.textSecondary, fontSize: 12 }}>View your trophies, badges, and milestones</Text>
+          </View>
+          <ChevronRight size={18} color={Colors.textSecondary} />
+        </TouchableOpacity>
 
+        <HealthConnectionsCard />
+
+        <View style={styles.themeCard}>
+          <View style={styles.themeIntro}>
+            <Text style={styles.themeTitle}>Appearance</Text>
+            <Text style={styles.themeHint}>{preference === 'system' ? `Following your phone · ${mode === 'dark' ? 'Dark' : 'Light'}` : `${mode === 'dark' ? 'Dark' : 'Light'} theme selected`}</Text>
+          </View>
+          <View style={styles.themeChoices}>
+            {([
+              { id: 'system' as const, label: 'System', Icon: Shield },
+              { id: 'light' as const, label: 'Light', Icon: Sun },
+              { id: 'dark' as const, label: 'Dark', Icon: Moon },
+            ]).map(({ id, label, Icon }) => {
+              const selected = preference === id;
+              return <TouchableOpacity key={id} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setPreference(id)} style={[styles.themeChoice, selected && styles.themeChoiceSelected]}>
+                <Icon size={16} color={selected ? '#FFFFFF' : Colors.textSecondary} />
+                <Text style={[styles.themeChoiceText, selected && styles.themeChoiceTextSelected]}>{label}</Text>
+              </TouchableOpacity>;
+            })}
+          </View>
+        </View>
         {/* Recalculated Caloric Target Pill */}
         <View style={styles.recalcBanner}>
           <Flame size={20} color={Colors.accentOrange} />
@@ -514,6 +573,15 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
             keyboardType="numeric"
             placeholder="e.g. 71"
           />
+          <Text style={[styles.label, { marginTop: 12 }]}>Goal timeline</Text>
+          <Text style={styles.helperText}>Choose when you would like to review your target.</Text>
+          <View style={styles.choiceGroup}>
+            {[1, 3, 6, 9, 12].map((months) => (
+              <TouchableOpacity key={months} style={[styles.choicePill, goalTimelineMonths === months && styles.choicePillActive]} onPress={() => { setGoalTimelineMonths(months); markEdited(); }}>
+                <Text style={[styles.choicePillText, goalTimelineMonths === months && styles.choicePillTextActive]}>{months} mo</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Section: Goals & Activity */}
@@ -700,7 +768,7 @@ function ageFromDateOfBirth(value?: string): number | undefined {
   return age >= 0 ? age : undefined;
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -713,7 +781,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 52 : 36,
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
     flexDirection: 'row',
@@ -754,14 +822,30 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  photoCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 15, borderRadius: 20,
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 15,
+  profileIntro: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 4, paddingVertical: 14, marginBottom: 10 },
+  profileAvatarWrap: { position: 'relative', width: 72, height: 72 },
+  profilePhotoEditButton: { position: 'absolute', right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.primary, borderWidth: 2, borderColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  profileIntroEyebrow: { fontSize: 11, letterSpacing: 1, fontWeight: '900', color: Colors.accentOrange },
+  profileIntroName: { fontSize: 22, fontWeight: '900', color: Colors.textPrimary, marginTop: 3 },
+  profileIntroSub: { fontSize: 13, lineHeight: 18, color: Colors.textSecondary, marginTop: 3 },
+  themeCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    marginBottom: 15,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    gap: 12,
   },
-  photoTitle: { color: Colors.textPrimary, fontSize: 17, fontWeight: '900' },
-  photoHint: { color: Colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 3 },
-  photoButton: { minHeight: 44, paddingHorizontal: 13, borderRadius: 13, backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  photoButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  themeIntro: { gap: 3, flex: 1 },
+  themeTitle: { color: Colors.textPrimary, fontSize: 17, fontWeight: '800' },
+  themeHint: { color: Colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  themeChoices: { flexDirection: 'row', gap: 6, padding: 4, borderRadius: 15, backgroundColor: Colors.backgroundLight, alignSelf: 'flex-start' },
+  themeChoice: { minHeight: 40, paddingHorizontal: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  themeChoiceSelected: { backgroundColor: Colors.primary },
+  themeChoiceText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '800' },
+  themeChoiceTextSelected: { color: '#FFFFFF' },
   recalcBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -784,7 +868,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 20,
     padding: 20,
     borderWidth: 1,
@@ -806,7 +890,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    backgroundColor: '#FAFAF8',
+    backgroundColor: '#0B1621',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 12,
@@ -819,7 +903,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   inputDisabled: {
-    backgroundColor: '#F3EDE2',
+    backgroundColor: '#12202B',
     color: Colors.textSecondary,
   },
   row: {
@@ -858,6 +942,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  helperText: { color: Colors.textSecondary, fontSize: 12, marginTop: -6, marginBottom: 8 },
   choicePill: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -888,7 +973,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   biometricCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 14,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1824', padding: 14,
     borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.borderSubtle,
   },
   biometricModalBackdrop: { flex: 1, backgroundColor: 'rgba(16, 24, 18, 0.48)', justifyContent: 'center', padding: 22 },
@@ -896,7 +981,7 @@ const styles = StyleSheet.create({
   biometricModalIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 13 },
   biometricModalTitle: { color: Colors.textPrimary, fontSize: 21, fontWeight: '900' },
   biometricModalBody: { color: Colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: 7, marginBottom: 14 },
-  biometricError: { color: Colors.danger, backgroundColor: '#FCE7E5', padding: 11, borderRadius: 12, fontSize: 14, lineHeight: 19, fontWeight: '700', marginBottom: 10 },
+  biometricError: { color: Colors.danger, backgroundColor: '#3B1C28', padding: 11, borderRadius: 12, fontSize: 14, lineHeight: 19, fontWeight: '700', marginBottom: 10 },
   biometricPinInput: { height: 58, borderRadius: 15, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.backgroundLight, color: Colors.textPrimary, textAlign: 'center', fontSize: 22, fontWeight: '800', letterSpacing: 8 },
   biometricModalActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   biometricCancelButton: { flex: 1, height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surfaceWarm },
@@ -917,7 +1002,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: '#203846',
     padding: 2,
     justifyContent: 'center',
   },
@@ -928,7 +1013,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
   },
   toggleThumbActive: {
     alignSelf: 'flex-end',
@@ -940,9 +1025,9 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 16,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#3B1C28',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#5A2731',
   },
   logoutText: {
     fontSize: 13,

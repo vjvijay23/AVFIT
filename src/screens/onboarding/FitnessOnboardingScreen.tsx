@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -51,6 +52,7 @@ export default function FitnessOnboardingScreen({
   navigation,
   onFinishOnboarding,
 }: FitnessOnboardingScreenProps) {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSaving, setIsSaving] = useState(false);
@@ -63,6 +65,7 @@ export default function FitnessOnboardingScreen({
   const [heightCm, setHeightCm] = useState('178');
   const [weightKg, setWeightKg] = useState('74');
   const [targetWeightKg, setTargetWeightKg] = useState('71');
+  const [goalTimelineMonths, setGoalTimelineMonths] = useState(3);
 
   // Step 2: Fitness Goals & Activity
   const [fitnessGoal, setFitnessGoal] = useState<FitnessGoal>('weight_loss');
@@ -102,6 +105,7 @@ export default function FitnessOnboardingScreen({
           setHeightCm(String(fitness.heightCm));
           setWeightKg(String(fitness.weightKg));
           setTargetWeightKg(fitness.targetWeightKg == null ? '' : String(fitness.targetWeightKg));
+          setGoalTimelineMonths(fitness.goalTimelineMonths || 3);
           setFitnessGoal(fitness.fitnessGoal);
           setFitnessLevel(fitness.fitnessLevel);
           setActivityLevel(fitness.activityLevel);
@@ -207,6 +211,7 @@ export default function FitnessOnboardingScreen({
           heightCm: parsedHeight,
           weightKg: parsedWeight,
           targetWeightKg: parseFloat(targetWeightKg) || undefined,
+          goalTimelineMonths,
           fitnessGoal,
           fitnessLevel,
           activityLevel,
@@ -361,6 +366,14 @@ export default function FitnessOnboardingScreen({
               placeholder="71"
               placeholderTextColor="#9EA6A0"
             />
+            <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Target timeline (months)</Text>
+            <View style={styles.choiceRow}>
+              {[1, 3, 6, 9, 12].map((months) => (
+                <TouchableOpacity key={months} style={[styles.timelineOption, goalTimelineMonths === months && styles.choiceCardActive]} onPress={() => setGoalTimelineMonths(months)}>
+                  <Text style={[styles.choiceTitle, goalTimelineMonths === months && styles.choiceTitleActive]}>{months}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
 
@@ -737,7 +750,7 @@ function ageFromDateOfBirth(value?: string): number | undefined {
   return age >= 0 ? age : undefined;
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -746,7 +759,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 52 : 36,
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
     flexDirection: 'row',
@@ -789,7 +802,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   stepCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 24,
     padding: 22,
     borderWidth: 1,
@@ -830,7 +843,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: '#FAFAF8',
+    backgroundColor: '#0B1621',
     borderWidth: 1.5,
     borderColor: Colors.border,
     borderRadius: 14,
@@ -887,7 +900,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   segmentActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -909,13 +922,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    backgroundColor: '#FAFAF8',
+    backgroundColor: '#0B1621',
     marginBottom: 10,
   },
   choiceCardActive: {
     borderColor: Colors.primary,
     backgroundColor: Colors.primarySoft,
   },
+  choiceRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  timelineOption: { flex: 1, minWidth: 48, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: '#0B1621' },
   choiceRadio: {
     width: 20,
     height: 20,
@@ -1052,7 +1067,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAFAF8',
+    backgroundColor: '#0B1621',
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
@@ -1090,7 +1105,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: '#203846',
     padding: 2,
     justifyContent: 'center',
   },
@@ -1101,7 +1116,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
   },
   toggleThumbActive: {
     alignSelf: 'flex-end',
@@ -1109,9 +1124,9 @@ const styles = StyleSheet.create({
   disclaimerBox: {
     flexDirection: 'row',
     gap: 10,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#392B18',
     borderWidth: 1,
-    borderColor: '#FED7AA',
+    borderColor: '#5A4326',
     padding: 12,
     borderRadius: 14,
   },
@@ -1119,7 +1134,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 11,
     lineHeight: 16,
-    color: '#9A3412',
+    color: '#FFD166',
     fontWeight: '500',
   },
   bottomBar: {
@@ -1127,7 +1142,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderTopWidth: 1,
     borderTopColor: Colors.borderSubtle,
     paddingHorizontal: 20,

@@ -28,8 +28,18 @@ type RequestOptions = RequestInit & {
 
 async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { authenticated = true, headers, onRequestStart, onResponse, ...init } = options;
-  const requestHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...(headers as Record<string, string> | undefined) };
-  if (authenticated && authToken) requestHeaders.Authorization = `Bearer ${authToken}`;
+  // Keep the token used by this request stable. Several requests can be in
+  // flight during screen loading; one expired-token response must not cause
+  // sibling requests to leak the backend's raw auth error to the UI.
+  const requestAuthToken = authenticated ? authToken : null;
+  // Only label JSON requests that actually carry a body. A bodyless POST with
+  // application/json can be rejected by Fastify's JSON parser before the route
+  // handler runs (for example, the community post-like endpoint).
+  const requestHeaders: Record<string, string> = {
+    ...(init.body !== undefined && init.body !== null ? { 'Content-Type': 'application/json' } : {}),
+    ...(headers as Record<string, string> | undefined),
+  };
+  if (requestAuthToken) requestHeaders.Authorization = `Bearer ${requestAuthToken}`;
   onRequestStart?.();
   const requestController = init.signal ? null : new AbortController();
   const requestTimeout = requestController
@@ -56,9 +66,11 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
   onResponse?.(response);
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if (response.status === 401 && authenticated && authToken) {
-      authToken = null;
-      await saveAuthSession(null);
+    if (response.status === 401 && requestAuthToken) {
+      if (authToken === requestAuthToken) {
+        authToken = null;
+        await saveAuthSession(null);
+      }
       throw new Error('Your sign-in has expired. Sign in again to continue.');
     }
     throw new Error(body?.error || `Backend request failed (${response.status})`);
@@ -94,6 +106,27 @@ export const BackendApi = {
         return null;
       }
       authToken = session.token;
+      // A saved token may belong to a different backend (for example, a live
+      // Render session opened against a local development API), or may have
+      // expired while the app was closed. Validate it before opening screens
+      // that immediately request protected user data.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/profile/${encodeURIComponent(session.userId)}`, {
+          headers: { Authorization: `Bearer ${session.token}` },
+          signal: controller.signal,
+        });
+        if ([401, 403, 404].includes(response.status)) {
+          authToken = null;
+          await SecureStorage.deleteItemAsync(AUTH_SESSION_KEY);
+          return null;
+        }
+      } catch {
+        // Preserve a valid cached session during temporary network outages.
+      } finally {
+        clearTimeout(timeout);
+      }
       return session.userId;
     } catch {
       return null;
@@ -215,6 +248,25 @@ export const BackendApi = {
     return apiRequest<{ success: boolean; profile: Record<string, unknown> | null }>('/fitness/profile');
   },
   getDashboard() { return apiRequest<Record<string, unknown>>('/fitness/dashboard'); },
+  getTrainingRecommendation(refresh = false) {
+    return apiRequest<{ success: boolean; recommendation: Record<string, any> }>(`/training-plan/today${refresh ? '?refresh=true' : ''}`);
+  },
+  getStravaStatus() {
+    return apiRequest<{ success: boolean; configured: boolean; connected: boolean; connection: Record<string, any> | null }>('/strava/status');
+  },
+  async startStravaConnection() {
+    const result = await apiRequest<{ success: boolean; authorizationUrl: string }>('/strava/connect', { method: 'POST' });
+    return result.authorizationUrl;
+  },
+  syncStravaActivities() {
+    return apiRequest<{ success: boolean; synced: number; activities: Array<Record<string, any>> }>('/strava/sync', { method: 'POST' });
+  },
+  getStravaActivities() {
+    return apiRequest<{ success: boolean; activities: Array<Record<string, any>> }>('/strava/activities');
+  },
+  disconnectStrava() {
+    return apiRequest<{ success: boolean }>('/strava/connection', { method: 'DELETE' });
+  },
   getWorkoutCatalog(filters: { category?: string; difficulty?: string } = {}) {
     const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as Array<[string, string]>).toString();
     return apiRequest<{ success: boolean; workouts: Array<Record<string, any>> }>(`/workouts${query ? `?${query}` : ''}`, { authenticated: false });
@@ -225,6 +277,52 @@ export const BackendApi = {
   completeWorkout(workoutId: string | undefined, durationSeconds: number, caloriesBurned?: number) {
     return apiRequest<{ success: boolean; log: Record<string, any>; newlyUnlocked: Array<Record<string, any>> }>('/workouts/complete', {
       method: 'POST', body: JSON.stringify({ workoutId, durationSeconds, caloriesBurned }),
+    });
+  },
+  getStrengthExercises(equipment?: string, muscle?: string, search?: string) {
+    const query = new URLSearchParams(Object.entries({ equipment, muscle, q: search }).filter(([, value]) => Boolean(value)) as Array<[string, string]>).toString();
+    return apiRequest<{ success: boolean; exercises: Array<Record<string, any>> }>(`/strength/exercises${query ? `?${query}` : ''}`, { authenticated: false });
+  },
+  getMyStrengthExercises() {
+    return apiRequest<{ success: boolean; exercises: Array<Record<string, any>> }>('/strength/my-exercises');
+  },
+  getStrengthExercise(exerciseId: string) {
+    return apiRequest<{ success: boolean; exercise: Record<string, any> }>(`/strength/exercises/${encodeURIComponent(exerciseId)}`);
+  },
+  createStrengthExercise(exercise: {
+    name: string;
+    equipment: string;
+    primaryMuscle: string;
+    secondaryMuscles?: string[];
+    description?: string;
+    instructions: string[];
+    imageBase64?: string;
+    imageMime?: string;
+  }) {
+    return apiRequest<{ success: boolean; exercise: Record<string, any> }>('/strength/exercises', {
+      method: 'POST', body: JSON.stringify(exercise),
+    });
+  },
+  getStrengthExerciseHistory(exerciseId: string) {
+    return apiRequest<{ success: boolean; sets: Array<{ setIndex: number; weightKg: number; reps: number; rpe?: number }> }>(`/strength/exercises/${encodeURIComponent(exerciseId)}/history`);
+  },
+  getStrengthWorkouts(limit = 20) {
+    return apiRequest<{ success: boolean; workouts: Array<Record<string, any>> }>(`/strength/workouts?limit=${limit}`);
+  },
+  getStrengthWorkout(workoutId: string) {
+    return apiRequest<{ success: boolean; workout: Record<string, any> }>(`/strength/workouts/${encodeURIComponent(workoutId)}`);
+  },
+  saveStrengthWorkout(workout: {
+    name: string;
+    startedAt: string;
+    completedAt: string;
+    exercises: Array<{
+      exerciseId: string;
+      sets: Array<{ setType: 'W' | 'N' | 'D' | 'F'; weightKg: number; reps: number; rpe?: number; isCompleted: boolean }>;
+    }>;
+  }) {
+    return apiRequest<{ success: boolean; workout: Record<string, any>; personalRecords: Array<{ exercise: string; metric: string; value: number }>; newlyUnlocked: Array<Record<string, any>> }>('/strength/workouts', {
+      method: 'POST', body: JSON.stringify(workout),
     });
   },
   getAchievementCatalog() {

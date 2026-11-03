@@ -19,6 +19,7 @@ import { communityRoutes } from './routes/community.routes.js';
 import { dietPlanRoutes } from './routes/diet-plan.routes.js';
 import { strengthRoutes } from './routes/strength.routes.js';
 import { trainingPlanRoutes } from './routes/training-plan.routes.js';
+import { stravaRoutes } from './routes/strava.routes.js';
 import { pool, redis } from './db/index.js';
 
 export async function buildApp() {
@@ -103,6 +104,7 @@ export async function buildApp() {
   await fastify.register(dietPlanRoutes, { prefix: '/api/v1/diet-plans' });
   await fastify.register(strengthRoutes, { prefix: '/api/v1/strength' });
   await fastify.register(trainingPlanRoutes, { prefix: '/api/v1/training-plan' });
+  await fastify.register(stravaRoutes, { prefix: '/api/v1/strava' });
 
   return fastify;
 }

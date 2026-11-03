@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS fitness_profiles (
     height_cm NUMERIC(5,2) NOT NULL CHECK (height_cm > 50 AND height_cm < 300),
     weight_kg NUMERIC(5,2) NOT NULL CHECK (weight_kg > 20 AND weight_kg < 400),
     target_weight_kg NUMERIC(5,2),
+    goal_timeline_months INT NOT NULL DEFAULT 3 CHECK (goal_timeline_months BETWEEN 1 AND 24),
     fitness_goal TEXT NOT NULL DEFAULT 'general_fitness' CHECK (fitness_goal IN ('weight_loss','muscle_gain','general_fitness','endurance','maintenance')),
     fitness_level TEXT NOT NULL DEFAULT 'beginner' CHECK (fitness_level IN ('beginner','intermediate','advanced')),
     activity_level TEXT NOT NULL DEFAULT 'moderately_active' CHECK (activity_level IN ('sedentary','lightly_active','moderately_active','very_active')),
@@ -147,6 +148,7 @@ CREATE TABLE IF NOT EXISTS fitness_profiles (
 
 ALTER TABLE fitness_profiles ADD COLUMN IF NOT EXISTS dietary_preference_other TEXT NOT NULL DEFAULT '';
 ALTER TABLE fitness_profiles ADD COLUMN IF NOT EXISTS custom_allergies_and_restrictions TEXT NOT NULL DEFAULT '';
+ALTER TABLE fitness_profiles ADD COLUMN IF NOT EXISTS goal_timeline_months INT NOT NULL DEFAULT 3;
 
 -- Curated workout catalog and completion history.
 CREATE TABLE IF NOT EXISTS workouts (
@@ -183,6 +185,39 @@ CREATE TABLE IF NOT EXISTS training_recommendations (
     UNIQUE(user_id, plan_date)
 );
 
+-- Strava credentials are stored encrypted by the application; activity rows
+-- are kept separate from AVFIT-recorded GPS sessions and deduplicated by ID.
+CREATE TABLE IF NOT EXISTS strava_connections (
+    user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+    athlete_id TEXT NOT NULL DEFAULT '',
+    athlete_name TEXT,
+    scopes TEXT NOT NULL DEFAULT '',
+    access_token_encrypted TEXT NOT NULL,
+    refresh_token_encrypted TEXT NOT NULL,
+    expires_at BIGINT NOT NULL,
+    connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS strava_activities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    strava_activity_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    sport_type TEXT NOT NULL,
+    start_date TIMESTAMPTZ NOT NULL,
+    distance_m NUMERIC(12,2) NOT NULL DEFAULT 0,
+    moving_time_sec INT NOT NULL DEFAULT 0,
+    elapsed_time_sec INT NOT NULL DEFAULT 0,
+    total_elevation_gain_m NUMERIC(10,2) NOT NULL DEFAULT 0,
+    average_speed_mps NUMERIC(8,3) NOT NULL DEFAULT 0,
+    max_speed_mps NUMERIC(8,3) NOT NULL DEFAULT 0,
+    average_heartrate NUMERIC(6,2),
+    calories INT NOT NULL DEFAULT 0,
+    polyline TEXT,
+    raw_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, strava_activity_id)
+);
+CREATE INDEX IF NOT EXISTS idx_strava_activities_user_date ON strava_activities(user_id, start_date DESC);
 
 -- Set-by-set strength training records. These extend the existing workout log
 -- without changing how guided workout summaries are stored.
@@ -192,8 +227,21 @@ CREATE TABLE IF NOT EXISTS strength_exercises (
     name TEXT NOT NULL,
     equipment TEXT NOT NULL CHECK (equipment IN ('barbell','dumbbell','machine','cable','bodyweight','kettlebell','smith_machine','resistance_band','ez_bar','trap_bar','medicine_ball','suspension_trainer','landmine')),
     primary_muscle TEXT NOT NULL,
+    owner_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    description TEXT NOT NULL DEFAULT '',
+    secondary_muscles TEXT[] NOT NULL DEFAULT '{}',
+    instructions TEXT[] NOT NULL DEFAULT '{}',
+    image_data BYTEA,
+    image_mime TEXT CHECK (image_mime IS NULL OR image_mime IN ('image/jpeg','image/png','image/webp')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE strength_exercises ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES profiles(id) ON DELETE CASCADE;
+ALTER TABLE strength_exercises ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';
+ALTER TABLE strength_exercises ADD COLUMN IF NOT EXISTS secondary_muscles TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE strength_exercises ADD COLUMN IF NOT EXISTS instructions TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE strength_exercises ADD COLUMN IF NOT EXISTS image_data BYTEA;
+ALTER TABLE strength_exercises ADD COLUMN IF NOT EXISTS image_mime TEXT;
+CREATE INDEX IF NOT EXISTS idx_strength_exercises_owner ON strength_exercises(owner_id) WHERE owner_id IS NOT NULL;
 ALTER TABLE strength_exercises DROP CONSTRAINT IF EXISTS strength_exercises_equipment_check;
 ALTER TABLE strength_exercises ADD CONSTRAINT strength_exercises_equipment_check
     CHECK (equipment IN ('barbell','dumbbell','machine','cable','bodyweight','kettlebell','smith_machine','resistance_band','ez_bar','trap_bar','medicine_ball','suspension_trainer','landmine'));

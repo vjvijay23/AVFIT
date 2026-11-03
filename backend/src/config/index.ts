@@ -16,6 +16,10 @@ export const config = {
   geminiTotalTimeoutMs: Math.max(2000, Number(process.env.GEMINI_TOTAL_TIMEOUT_MS) || 22000),
   jwtSecret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-only-change-me'),
   msg91AuthKey: process.env.MSG91_AUTHKEY || '',
+  stravaClientId: process.env.STRAVA_CLIENT_ID || '',
+  stravaClientSecret: process.env.STRAVA_CLIENT_SECRET || '',
+  stravaRedirectUri: process.env.STRAVA_REDIRECT_URI || '',
+  stravaTokenEncryptionKey: process.env.STRAVA_TOKEN_ENCRYPTION_KEY || '',
 };
 
 if (config.nodeEnv === 'production' && config.jwtSecret.length < 32) {

@@ -85,6 +85,7 @@ export interface FitnessProfile {
   heightCm: number;
   weightKg: number;
   targetWeightKg?: number;
+  goalTimelineMonths: number;
   fitnessGoal: FitnessGoal;
   fitnessLevel: FitnessLevel;
   activityLevel: ActivityLevel;

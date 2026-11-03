@@ -22,8 +22,12 @@ export async function fitnessRoutes(app: FastifyInstance) {
     const body = request.body || {};
     const height = Number(body.heightCm);
     const weight = Number(body.weightKg);
+    const goalTimelineMonths = Number(body.goalTimelineMonths ?? 3);
     if (!Number.isFinite(height) || height < 80 || height > 250 || !Number.isFinite(weight) || weight < 25 || weight > 350) {
       return reply.status(400).send({ error: 'heightCm must be 80–250 and weightKg must be 25–350.' });
+    }
+    if (!Number.isInteger(goalTimelineMonths) || goalTimelineMonths < 1 || goalTimelineMonths > 24) {
+      return reply.status(400).send({ error: 'goalTimelineMonths must be a whole number between 1 and 24.' });
     }
     for (const [key, allowed] of Object.entries(enumValues)) {
       if (body[key] !== undefined && !allowed.includes(body[key])) return reply.status(400).send({ error: `Invalid ${key}.` });
@@ -54,13 +58,14 @@ export async function fitnessRoutes(app: FastifyInstance) {
     const protein = Math.round(weight * 2);
     const fat = Math.round(calorieTarget * 0.25 / 9);
     const carbs = Math.max(0, Math.round((calorieTarget - protein * 4 - fat * 9) / 4));
-    const params = [userId, height, weight, body.targetWeightKg ?? null, body.fitnessGoal || 'general_fitness', body.fitnessLevel || 'beginner', body.activityLevel || 'moderately_active', body.workoutPreference || 'home', body.availableEquipment || ['bodyweight'], body.preferredWorkoutDurationMin || 30, body.weeklyWorkoutFrequencyDays || 4, body.dietaryPreference || 'non_vegetarian', body.dietaryPreferenceOther || '', body.allergiesAndRestrictions || [], body.customAllergiesAndRestrictions || '', bmr, tdee, calorieTarget, protein, carbs, fat, body.dailyStepGoal || 10000, Math.round(weight * 35 + 500), body.isPrivate !== false];
+    const params = [userId, height, weight, body.targetWeightKg ?? null, goalTimelineMonths, body.fitnessGoal || 'general_fitness', body.fitnessLevel || 'beginner', body.activityLevel || 'moderately_active', body.workoutPreference || 'home', body.availableEquipment || ['bodyweight'], body.preferredWorkoutDurationMin || 30, body.weeklyWorkoutFrequencyDays || 4, body.dietaryPreference || 'non_vegetarian', body.dietaryPreferenceOther || '', body.allergiesAndRestrictions || [], body.customAllergiesAndRestrictions || '', bmr, tdee, calorieTarget, protein, carbs, fat, body.dailyStepGoal || 10000, Math.round(weight * 35 + 500), body.isPrivate !== false];
     const result = await pool.query(`INSERT INTO fitness_profiles (
-      user_id,height_cm,weight_kg,target_weight_kg,fitness_goal,fitness_level,activity_level,workout_preference,available_equipment,
+      user_id,height_cm,weight_kg,target_weight_kg,goal_timeline_months,fitness_goal,fitness_level,activity_level,workout_preference,available_equipment,
       preferred_workout_duration_min,weekly_workout_frequency_days,dietary_preference,dietary_preference_other,allergies_and_restrictions,custom_allergies_and_restrictions,bmr,tdee,
       daily_calorie_target,daily_protein_g,daily_carbs_g,daily_fat_g,daily_step_goal,daily_water_ml,is_private)
       VALUES (${params.map((_,i)=>`$${i+1}`).join(',')})
       ON CONFLICT(user_id) DO UPDATE SET height_cm=EXCLUDED.height_cm,weight_kg=EXCLUDED.weight_kg,target_weight_kg=EXCLUDED.target_weight_kg,
+      goal_timeline_months=EXCLUDED.goal_timeline_months,
       fitness_goal=EXCLUDED.fitness_goal,fitness_level=EXCLUDED.fitness_level,activity_level=EXCLUDED.activity_level,workout_preference=EXCLUDED.workout_preference,
       available_equipment=EXCLUDED.available_equipment,preferred_workout_duration_min=EXCLUDED.preferred_workout_duration_min,
       weekly_workout_frequency_days=EXCLUDED.weekly_workout_frequency_days,dietary_preference=EXCLUDED.dietary_preference,
@@ -69,6 +74,7 @@ export async function fitnessRoutes(app: FastifyInstance) {
       daily_protein_g=EXCLUDED.daily_protein_g,daily_carbs_g=EXCLUDED.daily_carbs_g,daily_fat_g=EXCLUDED.daily_fat_g,
       daily_step_goal=EXCLUDED.daily_step_goal,daily_water_ml=EXCLUDED.daily_water_ml,is_private=EXCLUDED.is_private,updated_at=NOW() RETURNING *`, params);
     await pool.query('UPDATE profiles SET is_onboarded=TRUE, updated_at=NOW() WHERE id=$1', [userId]);
+    await pool.query('DELETE FROM training_recommendations WHERE user_id=$1', [userId]);
     await AchievementService.updateMetric(userId, 'onboarding', 1);
     return { success: true, profile: result.rows[0] };
   });
