@@ -172,6 +172,18 @@ CREATE TABLE IF NOT EXISTS workout_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_workout_logs_user_date ON workout_logs(user_id, completed_at DESC);
 
+-- One AI-generated training recommendation per user per local server day.
+CREATE TABLE IF NOT EXISTS training_recommendations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    plan_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    recommendation JSONB NOT NULL,
+    model TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, plan_date)
+);
+
+
 -- Set-by-set strength training records. These extend the existing workout log
 -- without changing how guided workout summaries are stored.
 CREATE TABLE IF NOT EXISTS strength_exercises (
