@@ -461,7 +461,7 @@ export default function ProfileEditScreen({ navigation, onLoggedOut }: ProfileEd
           <ChevronRight size={18} color={Colors.textSecondary} />
         </TouchableOpacity>
 
-        <HealthConnectionsCard />
+        <HealthConnectionsCard settingsMode />
 
         <View style={styles.themeCard}>
           <View style={styles.themeIntro}>

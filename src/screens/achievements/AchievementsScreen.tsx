@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -43,9 +44,9 @@ const CATEGORIES: { id: 'all' | AchievementCategory; label: string }[] = [
 ];
 
 const TIER_COLORS: Record<TrophyTier, { bg: string; border: string; text: string; glow: string }> = {
-  bronze: { bg: '#FDF7F2', border: '#CD7F32', text: '#9B5A1A', glow: 'rgba(205, 127, 50, 0.2)' },
+  bronze: { bg: '#211B16', border: '#CD7F32', text: '#9B5A1A', glow: 'rgba(205, 127, 50, 0.2)' },
   silver: { bg: '#F8FAFC', border: '#94A3B8', text: '#475569', glow: 'rgba(148, 163, 184, 0.2)' },
-  gold: { bg: '#FEF9C3', border: '#EAB308', text: '#A16207', glow: 'rgba(234, 179, 8, 0.2)' },
+  gold: { bg: '#FEF9C3', border: '#EAB308', text: '#FFD166', glow: 'rgba(234, 179, 8, 0.2)' },
   platinum: { bg: '#E0F2FE', border: '#0284C7', text: '#0369A1', glow: 'rgba(2, 132, 199, 0.2)' },
   diamond: { bg: '#FCE7F3', border: '#BE185D', text: '#9D174D', glow: 'rgba(190, 24, 93, 0.25)' },
 };
@@ -55,6 +56,7 @@ interface AchievementsScreenProps {
 }
 
 export default function AchievementsScreen({ navigation }: AchievementsScreenProps) {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState<'all' | AchievementCategory>('all');
   const [achievements, setAchievements] = useState<UserAchievement[]>([]);
@@ -328,7 +330,7 @@ export default function AchievementsScreen({ navigation }: AchievementsScreenPro
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -337,7 +339,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 52 : 36,
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
     flexDirection: 'row',
@@ -376,7 +378,7 @@ const styles = StyleSheet.create({
     paddingBottom: 90,
   },
   scoreHero: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 22,
     padding: 18,
     borderWidth: 1,
@@ -480,7 +482,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -504,7 +506,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#E5DFD4',
+    backgroundColor: '#20313B',
     overflow: 'hidden',
   },
   progressBarFill: {
@@ -524,7 +526,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
   },
@@ -545,7 +547,7 @@ const styles = StyleSheet.create({
   },
   trophyCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
@@ -559,8 +561,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   trophyCardLocked: {
-    backgroundColor: '#FAF8F4',
-    borderColor: '#ECE6DA',
+    backgroundColor: '#09131E',
+    borderColor: '#203846',
   },
   emblemBox: {
     width: 58,
@@ -585,7 +587,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   trophyTitleLocked: {
-    color: '#656057',
+    color: '#A4B8C1',
   },
   tierBadge: {
     paddingHorizontal: 8,
@@ -639,7 +641,7 @@ const styles = StyleSheet.create({
   lockedTrack: {
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#E5DFD4',
+    backgroundColor: '#20313B',
     overflow: 'hidden',
     marginBottom: 4,
   },

@@ -34,3 +34,13 @@ Thumbs.db
 
 # Temporary & Log files
 *.log
+
+# Local build artifacts and generated test outputs
+*.apk
+.codex-build/
+android/.codex-build/
+android/android/
+output/*.png
+output/pdf/_preview/
+output/pdf/*.pdf
+vlc-help.txt

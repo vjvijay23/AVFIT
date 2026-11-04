@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../../theme/colors';
@@ -8,6 +9,7 @@ interface KilometerSplitsTableProps {
 }
 
 export default function KilometerSplitsTable({ splits }: KilometerSplitsTableProps) {
+  const styles = useThemeStyles(createStyles);
   if (!splits || splits.length === 0) return null;
 
   return (
@@ -68,9 +70,9 @@ export default function KilometerSplitsTable({ splits }: KilometerSplitsTablePro
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 20,
     padding: 18,
     marginVertical: 14,

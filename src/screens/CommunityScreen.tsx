@@ -1,3 +1,4 @@
+import { useTheme, useThemeStyles } from '../theme/ThemeContext';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
@@ -19,11 +20,14 @@ import {
   Flame,
   Plus,
   Sparkles,
+  UserRound,
 } from 'lucide-react-native';
 import { BackendApi } from '../services/backendApi';
 import AppNoticeCard from '../components/common/AppNoticeCard';
 
 export default function CommunityScreen({ navigation }: any) {
+  const styles = useThemeStyles(createStyles);
+  const { mode } = useTheme();
   const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,7 +50,7 @@ export default function CommunityScreen({ navigation }: any) {
         id: post.id,
         author: post.full_name || 'AVFIT Athlete',
         timeAgo: new Date(post.created_at).toLocaleString(),
-        avatarEmoji: post.avatar_url || '🏃‍♂️',
+        avatarEmoji: post.avatar_url || '',
         badge: String(post.post_type || 'general').replaceAll('_', ' '),
         content: post.content,
         stats: '',
@@ -148,10 +152,11 @@ export default function CommunityScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={Colors.background} />
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 130 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         
         {/* Top Header */}
@@ -204,7 +209,7 @@ export default function CommunityScreen({ navigation }: any) {
           <View key={post.id} style={styles.postCard}>
             <View style={styles.postAuthorRow}>
               <View style={styles.avatarPill}>
-                <Text style={{ fontSize: 18 }}>{post.avatarEmoji}</Text>
+                {post.avatarEmoji ? <Text style={{ fontSize: 18 }}>{post.avatarEmoji}</Text> : <UserRound size={18} color={Colors.primaryLight} />}
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={styles.authorName}>{post.author}</Text>
@@ -255,11 +260,17 @@ export default function CommunityScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
             {expandedPostId === post.id && <View style={styles.commentsBox}>
-              {(commentsByPost[post.id] || []).map((comment) => <Text key={comment.id} style={styles.postTime}><Text style={styles.authorName}>{comment.full_name || 'Athlete'}: </Text>{comment.content}</Text>)}
+              {(commentsByPost[post.id] || []).map((comment) => <Text key={comment.id} style={styles.commentItem}><Text style={styles.authorName}>{comment.full_name || 'Athlete'}: </Text>{comment.content}</Text>)}
               <View style={styles.commentComposer}>
                 <TextInput value={commentDraft} onChangeText={setCommentDraft} placeholder="Write a comment" maxLength={1000} style={styles.commentInput} />
-                <TouchableOpacity onPress={() => publishComment(post.id)} disabled={postingComment || !commentDraft.trim()}>
-                  <Text style={styles.publishButtonText}>{postingComment ? '…' : 'Send'}</Text>
+                <TouchableOpacity
+                  style={[styles.commentSendButton, (postingComment || !commentDraft.trim()) && styles.commentSendButtonDisabled]}
+                  onPress={() => publishComment(post.id)}
+                  disabled={postingComment || !commentDraft.trim()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Post comment"
+                >
+                  <Text style={styles.commentSendButtonText}>{postingComment ? 'Posting…' : 'Post'}</Text>
                 </TouchableOpacity>
               </View>
             </View>}
@@ -271,15 +282,19 @@ export default function CommunityScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  commentsBox: { borderTopWidth: 1, borderTopColor: Colors.borderSubtle, marginTop: 10, paddingTop: 10 },
-  commentComposer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
-  commentInput: { flex: 1, backgroundColor: Colors.background, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, color: Colors.textPrimary, fontSize: 12 },
-  composer: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: Colors.borderSubtle },
+const createStyles = () => ({
+  commentsBox: { borderTopWidth: 1, borderTopColor: Colors.borderSubtle, marginTop: 14, paddingTop: 13 },
+  commentItem: { color: Colors.textSecondary, backgroundColor: Colors.surfaceWarm, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8, fontSize: 14, lineHeight: 21 },
+  commentComposer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 11 },
+  commentInput: { flex: 1, minWidth: 0, minHeight: 48, backgroundColor: Colors.background, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, color: Colors.textPrimary, fontSize: 14 },
+  commentSendButton: { backgroundColor: Colors.primary, borderRadius: 14, paddingHorizontal: 16, minHeight: 48, minWidth: 68, alignItems: 'center', justifyContent: 'center' },
+  commentSendButtonDisabled: { opacity: 0.5 },
+  commentSendButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  composer: { backgroundColor: '#0D1824', borderRadius: 18, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: Colors.borderSubtle },
   composerInput: { minHeight: 72, color: Colors.textPrimary, textAlignVertical: 'top', fontSize: 14 },
   publishButton: { alignSelf: 'flex-end', backgroundColor: Colors.primary, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 8, marginTop: 8 },
   publishButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
-  challengeCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: Colors.borderSubtle, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  challengeCard: { backgroundColor: '#0D1824', borderRadius: 18, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: Colors.borderSubtle, flexDirection: 'row', alignItems: 'center', gap: 10 },
   challengeButton: { backgroundColor: Colors.primary, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 8 },
   challengeButtonText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
   container: {
@@ -318,7 +333,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   announcementBanner: {
-    backgroundColor: '#F3EDE2',
+    backgroundColor: '#12202B',
     borderRadius: 22,
     padding: 14,
     flexDirection: 'row',
@@ -331,7 +346,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -346,7 +361,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   postCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 24,
     padding: 16,
     borderWidth: 1,
@@ -366,7 +381,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F7F0E4',
+    backgroundColor: '#12202B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -380,7 +395,7 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   achievementBadge: {
-    backgroundColor: '#E8F1EC',
+    backgroundColor: '#103B35',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 10,
@@ -400,7 +415,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAF5EE',
+    backgroundColor: '#12202B',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 8,
@@ -416,7 +431,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: '#F5EFEB',
+    borderTopColor: '#12202B',
     paddingTop: 10,
   },
   actionItem: {

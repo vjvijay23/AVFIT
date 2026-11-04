@@ -1,4 +1,5 @@
 import { Platform, PermissionsAndroid, Linking, Alert } from 'react-native';
+import Geolocation from 'react-native-geolocation-service';
 import { PermissionFlowState, PermissionStatus } from '../types';
 
 export class PermissionManager {
@@ -6,6 +7,17 @@ export class PermissionManager {
    * Evaluates the current location, notification, and background permissions on the device.
    */
   static async checkPermissions(): Promise<PermissionFlowState> {
+    if (Platform.OS === 'ios') {
+      const authorization = await Geolocation.requestAuthorization('always');
+      const granted = authorization === 'granted';
+      return {
+        fineLocation: granted ? 'granted' : 'denied',
+        notification: 'not_applicable',
+        backgroundLocation: granted ? 'granted' : 'denied',
+        isBatteryOptimizationExempt: true,
+        canStartForegroundTracking: granted,
+      };
+    }
     if (Platform.OS !== 'android') {
       return {
         fineLocation: 'granted',
@@ -58,6 +70,17 @@ export class PermissionManager {
    * Step 3: Optional Background Location (Android 10+ / API 29) with disclosure
    */
   static async requestSequentialPermissions(): Promise<PermissionFlowState> {
+    if (Platform.OS === 'ios') {
+      const authorization = await Geolocation.requestAuthorization('always');
+      const granted = authorization === 'granted';
+      return {
+        fineLocation: granted ? 'granted' : 'denied',
+        notification: 'not_applicable',
+        backgroundLocation: granted ? 'granted' : 'denied',
+        isBatteryOptimizationExempt: true,
+        canStartForegroundTracking: granted,
+      };
+    }
     if (Platform.OS !== 'android') {
       return {
         fineLocation: 'granted',

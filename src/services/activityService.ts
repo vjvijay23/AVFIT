@@ -110,6 +110,7 @@ export const ActivityService = {
         ...stored,
         todaySteps: Number(activity.steps || 0),
         todayStepGoal: Number(targets.daily_step_goal || stored.todayStepGoal),
+        todayDistanceKm: Number(activity.distance_km || 0),
         todayCalories: Number(activity.calories_burned || 0),
         totalCaloriesBurned: Number(activity.calories_burned || 0) + stored.totalCaloriesBurned,
       };
@@ -239,13 +240,13 @@ export const ActivityService = {
     const percentage = bpm / maxHr;
 
     if (percentage >= 0.85) {
-      return { zone: 'peak', label: 'Peak Zone', color: '#D32F2F' };
+      return { zone: 'peak', label: 'Peak Zone', color: '#FF647C' };
     } else if (percentage >= 0.7) {
-      return { zone: 'cardio', label: 'Cardio Zone', color: '#EB7142' };
+      return { zone: 'cardio', label: 'Cardio Zone', color: '#2DF461' };
     } else if (percentage >= 0.6) {
-      return { zone: 'fat_burn', label: 'Fat Burn', color: '#244A32' };
+      return { zone: 'fat_burn', label: 'Fat Burn', color: '#00D7C2' };
     } else {
-      return { zone: 'warmup', label: 'Warmup', color: '#4A7C9B' };
+      return { zone: 'warmup', label: 'Warmup', color: '#63B9D1' };
     }
   },
 

@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import {
   View,
@@ -44,6 +45,7 @@ interface SignupScreenProps {
 }
 
 export default function SignupScreen({ navigation }: SignupScreenProps) {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   // Profile Input States
   const [fullName, setFullName] = useState('');
@@ -156,7 +158,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
         <View style={styles.card}>
           <Text style={styles.title}>Create AVFIT Account</Text>
           <Text style={styles.subtitle}>
-            Join thousands tracking activities, scanning meals with AI, and competing in fitness challenges.
+            Create your account to start tracking workouts and meals.
           </Text>
 
           {errorMessage && (
@@ -304,7 +306,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -324,14 +326,14 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 26,
     padding: 22,
     borderWidth: 1,
@@ -358,7 +360,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#3B1C28',
     padding: 10,
     borderRadius: 12,
     marginBottom: 16,
@@ -407,7 +409,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.border,
     borderRadius: 14,
-    backgroundColor: '#FAFAF8',
+    backgroundColor: '#0B1621',
     paddingHorizontal: 12,
     marginBottom: 14,
   },
@@ -427,7 +429,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: '#FAFAF8',
+    backgroundColor: '#0B1621',
     marginBottom: 14,
   },
   countryPickerButton: {
@@ -456,7 +458,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   countryDropdown: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -503,7 +505,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    backgroundColor: '#FAFAF8',
+    backgroundColor: '#0B1621',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 2,

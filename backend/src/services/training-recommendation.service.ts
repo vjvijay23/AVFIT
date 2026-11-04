@@ -38,19 +38,30 @@ export class TrainingRecommendationService {
       (error as Error & { statusCode?: number }).statusCode = 409;
       throw error;
     }
+    const profileEquipment = Array.isArray(profile.available_equipment) && profile.available_equipment.length
+      ? profile.available_equipment.map((item: unknown) => String(item))
+      : null;
+    const exerciseCatalog = await pool.query(
+      `SELECT name,equipment,primary_muscle FROM strength_exercises
+       WHERE (owner_id IS NULL OR owner_id=$1)
+         AND ($2::text[] IS NULL OR equipment=ANY($2::text[]))
+       ORDER BY owner_id NULLS FIRST,name LIMIT 120`,
+      [userId, profileEquipment],
+    ).catch(() => ({ rows: [] as Array<Record<string, any>> }));
     const context = {
       date: new Date().toISOString().slice(0, 10),
       profile,
       recentStrengthWorkouts: workoutsResult.rows,
       recentOutdoorActivities: activitiesResult.rows,
       nutritionLoggedToday: mealsResult.rows[0],
+      availableStrengthExercises: exerciseCatalog.rows,
       goalRoadmap: createGoalRoadmap(profile),
     };
     const model = new GoogleGenerativeAI(config.geminiApiKey).getGenerativeModel({
       model: config.geminiModel,
       generationConfig: { responseMimeType: 'application/json', temperature: 0.35 },
     });
-    const prompt = `Create a safe, practical workout recommendation for today and a brief next-day preview for an AVFIT user. Build it from the user's AVFIT profile, chosen fitness goal, current and target weight, target timeline, AVFIT-recorded sessions, and today's logged macros. Strava is a separate optional integration: never require, query, infer, or use Strava data for this plan. Avoid repeating hard training of the same type on consecutive days; use rest or mobility when recent workload suggests recovery. Match available equipment, workout preference, experience and duration. Do not invent medical conditions, performance metrics, or unlogged nutrition. If no history exists, give a conservative beginner-friendly starter. Nutrition note should compare today's consumed calories/protein/carbs/fat to saved targets and suggest a simple balanced next step; never prescribe extreme restriction. Include a short actionable session (warm-up and exercises or intervals), never claim certainty. JSON only: {"headline":string,"activity_type":"strength"|"run"|"walk"|"mobility"|"recovery"|"rest","duration_minutes":integer,"intensity":"easy"|"moderate"|"challenging"|"rest","reason":string,"workout":[string],"tomorrow":string,"nutrition_note":string}. If rest, duration_minutes must be 0 and workout should contain recovery suggestions. Context: ${JSON.stringify(context)}`;
+    const prompt = `Create a safe, practical workout recommendation for today and a brief next-day preview for an AVFIT user. Build it from the user's AVFIT profile, chosen fitness goal, current and target weight, target timeline, AVFIT-recorded sessions, and today's logged macros. Strava is a separate optional integration: never require, query, infer, or use Strava data for this plan. Avoid repeating hard training of the same type on consecutive days; use rest or mobility when recent workload suggests recovery. Match available equipment, workout preference, experience and duration. Do not invent medical conditions, performance metrics, or unlogged nutrition. If no history exists, give a conservative beginner-friendly starter. Nutrition note should compare today's consumed calories/protein/carbs/fat to saved targets and suggest a simple balanced next step; never prescribe extreme restriction. For strength workouts, choose exercise names exactly as written in availableStrengthExercises; never invent an exercise name, equipment type, or exercise that is not listed. Format each strength item as "Exercise: <exact catalog name> - <sets> sets of <reps> reps" so AVFIT can add it to the editable workout logger. Include a warm-up as its own item if useful, but do not label a warm-up as an exercise. JSON only: {"headline":string,"activity_type":"strength"|"run"|"walk"|"mobility"|"recovery"|"rest","duration_minutes":integer,"intensity":"easy"|"moderate"|"challenging"|"rest","reason":string,"workout":[string],"tomorrow":string,"nutrition_note":string}. If rest, duration_minutes must be 0 and workout should contain recovery suggestions. Context: ${JSON.stringify(context)}`;
     let recommendation: z.infer<typeof recommendationSchema>;
     try {
       recommendation = recommendationSchema.parse(JSON.parse((await model.generateContent(prompt)).response.text()));

@@ -130,7 +130,7 @@ class WalkingForegroundServiceManager {
         name: 'ic_launcher',
         type: 'mipmap',
       },
-      color: options?.notificationColor || '#FC5200', // Strava Orange
+      color: options?.notificationColor || '#2DF461', // Strava Orange
       linkingURI: 'com.avfit.app://walking',
       parameters: {
         updateIntervalMs: options?.updateIntervalMs || 1000,

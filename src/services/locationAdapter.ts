@@ -4,8 +4,17 @@ import Geolocation, { type GeoPosition } from 'react-native-geolocation-service'
 export type LocationPermission = { status: 'granted' | 'denied'; canAskAgain: boolean };
 export type LocationSubscription = { remove: () => void };
 
+async function requestIOSLocationPermission(): Promise<LocationPermission> {
+  const authorization = await Geolocation.requestAuthorization('whenInUse');
+  return {
+    status: authorization === 'granted' ? 'granted' : 'denied',
+    canAskAgain: authorization !== 'restricted',
+  };
+}
+
 export async function requestLocationPermission(): Promise<LocationPermission> {
   if (Platform.OS === 'web') return { status: 'granted', canAskAgain: true };
+  if (Platform.OS === 'ios') return requestIOSLocationPermission();
   // Android 12+ expects coarse and fine location to be requested together.
   // Requesting only fine can leave users in a denied state when they choose
   // approximate location in the system dialog.
@@ -23,6 +32,7 @@ export async function requestLocationPermission(): Promise<LocationPermission> {
 
 export async function getLocationPermission(): Promise<LocationPermission> {
   if (Platform.OS === 'web') return { status: 'granted', canAskAgain: true };
+  if (Platform.OS === 'ios') return requestIOSLocationPermission();
   const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
   return { status: granted ? 'granted' : 'denied', canAskAgain: true };
 }

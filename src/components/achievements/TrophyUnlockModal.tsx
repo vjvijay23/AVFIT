@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React from 'react';
 import {
   View,
@@ -41,6 +42,7 @@ export default function TrophyUnlockModal({
   onClose,
   onShare,
 }: TrophyUnlockModalProps) {
+  const styles = useThemeStyles(createStyles);
   if (!achievement) return null;
 
   const tierStyle = TIER_COLORS[achievement.tier] || TIER_COLORS.bronze;
@@ -119,7 +121,7 @@ export default function TrophyUnlockModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(22, 26, 23, 0.75)',
@@ -130,7 +132,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 28,
     padding: 24,
     alignItems: 'center',

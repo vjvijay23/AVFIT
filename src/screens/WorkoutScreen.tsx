@@ -1,3 +1,4 @@
+import { useTheme, useThemeStyles } from '../theme/ThemeContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -24,6 +25,8 @@ import {
 import { BackendApi } from '../services/backendApi';
 
 export default function WorkoutScreen({ navigation }: any) {
+  const styles = useThemeStyles(createStyles);
+  const { mode } = useTheme();
   const insets = useSafeAreaInsets();
   const [timeToggle, setTimeToggle] = useState<'Day' | 'Week'>('Day');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -80,7 +83,7 @@ export default function WorkoutScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={Colors.background} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 130 + insets.bottom }]}
@@ -138,14 +141,14 @@ export default function WorkoutScreen({ navigation }: any) {
 
         {/* Metric Badges (Stretch: 78%, Endurance: 64%, Stability: 71%) */}
         <View style={styles.metricBadgesRow}>
-          <View style={[styles.metricPill, { backgroundColor: '#EDE4F2' }]}>
-            <Text style={[styles.metricPillText, { color: '#6A4B82' }]}>Stretch: 78%</Text>
+          <View style={[styles.metricPill, { backgroundColor: '#241C36' }]}>
+            <Text style={[styles.metricPillText, { color: '#C5A7FF' }]}>Stretch: 78%</Text>
           </View>
-          <View style={[styles.metricPill, { backgroundColor: '#E4EEF2' }]}>
-            <Text style={[styles.metricPillText, { color: '#3A6878' }]}>Endurance: 64%</Text>
+          <View style={[styles.metricPill, { backgroundColor: '#12202B' }]}>
+            <Text style={[styles.metricPillText, { color: '#75C1D5' }]}>Endurance: 64%</Text>
           </View>
-          <View style={[styles.metricPill, { backgroundColor: '#F3EDE2' }]}>
-            <Text style={[styles.metricPillText, { color: '#78603A' }]}>Stability: 71%</Text>
+          <View style={[styles.metricPill, { backgroundColor: '#12202B' }]}>
+            <Text style={[styles.metricPillText, { color: '#C8A56A' }]}>Stability: 71%</Text>
           </View>
         </View>
 
@@ -256,15 +259,15 @@ export default function WorkoutScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   catalogTitle: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary, marginTop: 24, marginBottom: 4 },
   catalogSubtitle: { fontSize: 12, lineHeight: 17, color: Colors.textSecondary, marginBottom: 10 },
-  workoutCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: Colors.borderSubtle, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  workoutCard: { backgroundColor: '#0D1824', borderRadius: 18, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: Colors.borderSubtle, flexDirection: 'row', alignItems: 'center', gap: 10 },
   workoutName: { color: Colors.textPrimary, fontSize: 14, fontWeight: '800', marginBottom: 4 },
   workoutMeta: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 5 },
   completeButton: { backgroundColor: Colors.primary, borderRadius: 16, minWidth: 72, paddingHorizontal: 10, paddingVertical: 9, alignItems: 'center' },
   completeButtonText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
-  logRow: { color: Colors.textSecondary, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 12, marginBottom: 8, fontSize: 12, fontWeight: '700' },
+  logRow: { color: Colors.textSecondary, backgroundColor: '#0D1824', borderRadius: 14, padding: 12, marginBottom: 8, fontSize: 12, fontWeight: '700' },
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -284,7 +287,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -292,7 +295,7 @@ const styles = StyleSheet.create({
   },
   dayWeekTogglePill: {
     flexDirection: 'row',
-    backgroundColor: '#F3EDE2',
+    backgroundColor: '#12202B',
     padding: 3,
     borderRadius: 22,
   },
@@ -344,7 +347,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -359,7 +362,7 @@ const styles = StyleSheet.create({
     bottom: -4,
   },
   sleepCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 26,
     padding: 18,
     borderWidth: 1,
@@ -405,7 +408,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: '#F7F2EA',
+    backgroundColor: '#12202B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -413,7 +416,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: '#F3EDE2',
+    borderTopColor: '#203846',
     paddingTop: 12,
   },
   checkCircle: {
@@ -427,10 +430,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentOrange,
   },
   checkCirclePending: {
-    backgroundColor: '#EAE1D3',
+    backgroundColor: '#172833',
   },
   stretchCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 24,
     padding: 16,
     flexDirection: 'row',
@@ -443,7 +446,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 18,
-    backgroundColor: '#F3EDE2',
+    backgroundColor: '#12202B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -476,7 +479,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#E8F1EC',
+    backgroundColor: '#103B35',
     borderWidth: 1.5,
     borderColor: Colors.primary,
     alignItems: 'center',

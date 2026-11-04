@@ -55,6 +55,7 @@ export class UserStore {
       streakDays: 0,
       todaySteps: 0,
       todayStepGoal: 8000,
+      todayDistanceKm: 0,
       todayCalories: 0,
       todayWaterMl: 0,
       todayWaterGoalMl: 2500,
@@ -118,6 +119,7 @@ export class UserStore {
         streakDays: 0,
         todaySteps: 0,
         todayStepGoal: 8000,
+        todayDistanceKm: 0,
         todayCalories: 0,
         todayWaterMl: 0,
         todayWaterGoalMl: 2500,
@@ -151,6 +153,7 @@ export class UserStore {
     const newDuration = stats.totalDurationMinutes + Math.round(activity.activeDurationSeconds / 60);
     const newCalories = stats.totalCaloriesBurned + (activity.caloriesBurned || 0);
     const newTodayCalories = stats.todayCalories + (activity.caloriesBurned || 0);
+    const newTodayDistanceKm = Math.round((stats.todayDistanceKm + (activity.distanceKm || 0)) * 100) / 100;
 
     // Approximate step count for outdoor runs/walks if not explicitly counted
     let stepBonus = 0;
@@ -166,6 +169,7 @@ export class UserStore {
       totalDurationMinutes: newDuration,
       totalCaloriesBurned: newCalories,
       todayCalories: newTodayCalories,
+      todayDistanceKm: newTodayDistanceKm,
       todaySteps: newTodaySteps,
       streakDays: newStreak,
       lastActiveDate: new Date().toISOString().split('T')[0],

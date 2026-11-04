@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { pool } from '../db/index.js';
 import { AchievementService } from '../services/achievement.service.js';
@@ -27,19 +28,92 @@ const workoutSchema = z.object({
 type Bests = { estimated1rm: number; volume: number; weight: number };
 
 export async function strengthRoutes(app: FastifyInstance) {
-  app.get<{ Querystring: { equipment?: string } }>('/exercises', async (request, reply) => {
-    const equipment = request.query.equipment;
+  app.get<{ Querystring: { equipment?: string; muscle?: string; q?: string } }>('/exercises', async (request, reply) => {
+    const { equipment } = request.query;
     if (equipment && !['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight', 'kettlebell', 'smith_machine', 'resistance_band', 'ez_bar', 'trap_bar', 'medicine_ball', 'suspension_trainer', 'landmine'].includes(equipment)) {
       return reply.status(400).send({ error: 'Unsupported equipment filter.' });
     }
     const result = await pool.query(
-      `SELECT id, slug, name, equipment, primary_muscle AS "primaryMuscle"
+      `SELECT id, slug, name, equipment, primary_muscle AS "primaryMuscle",
+              secondary_muscles AS "secondaryMuscles", description, instructions
        FROM strength_exercises
-       WHERE ($1::text IS NULL OR equipment = $1)
+       WHERE owner_id IS NULL
+         AND ($1::text IS NULL OR equipment = $1)
+         AND ($2::text IS NULL OR primary_muscle = $2 OR $2 = ANY(secondary_muscles))
+         AND ($3::text IS NULL OR name ILIKE '%' || $3 || '%' OR primary_muscle ILIKE '%' || $3 || '%')
        ORDER BY equipment, name`,
-      [equipment || null],
+      [equipment || null, request.query.muscle?.trim().toLowerCase() || null, request.query.q?.trim() || null],
     );
     return { success: true, exercises: result.rows };
+  });
+
+  app.get('/my-exercises', { preHandler: requireAuth }, async (request) => {
+    const result = await pool.query(
+      `SELECT id, slug, name, equipment, primary_muscle AS "primaryMuscle",
+              secondary_muscles AS "secondaryMuscles", description, instructions,
+              (image_data IS NOT NULL) AS "hasImage"
+       FROM strength_exercises WHERE owner_id=$1 ORDER BY created_at DESC, name`,
+      [authenticatedUserId(request)],
+    );
+    return { success: true, exercises: result.rows };
+  });
+
+  app.post('/exercises', { preHandler: requireAuth }, async (request, reply) => {
+    const schema = z.object({
+      name: z.string().trim().min(2).max(80),
+      equipment: z.enum(['barbell','dumbbell','machine','cable','bodyweight','kettlebell','smith_machine','resistance_band','ez_bar','trap_bar','medicine_ball','suspension_trainer','landmine']),
+      primaryMuscle: z.string().trim().min(2).max(40).regex(/^[a-zA-Z_ -]+$/),
+      secondaryMuscles: z.array(z.string().trim().min(2).max(40)).max(6).default([]),
+      description: z.string().trim().max(500).default(''),
+      instructions: z.array(z.string().trim().min(2).max(240)).min(1).max(8),
+      imageBase64: z.string().max(700_000).optional(),
+      imageMime: z.enum(['image/jpeg','image/png','image/webp']).optional(),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid custom exercise.', details: parsed.error.flatten() });
+    const body = parsed.data;
+    let image: Buffer | null = null;
+    if (body.imageBase64) {
+      if (!body.imageMime || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(body.imageBase64)) {
+        return reply.status(400).send({ error: 'Provide a valid JPEG, PNG, or WebP image.' });
+      }
+      image = Buffer.from(body.imageBase64, 'base64');
+      if (!image.length || image.length > 500_000 || !isStrengthImage(image, body.imageMime)) {
+        return reply.status(400).send({ error: 'Exercise images must be valid and smaller than 500 KB.' });
+      }
+    }
+    const ownerId = authenticatedUserId(request);
+    const slug = `custom-${ownerId}-${randomUUID()}`;
+    const result = await pool.query(
+      `INSERT INTO strength_exercises
+         (slug,name,equipment,primary_muscle,owner_id,description,secondary_muscles,instructions,image_data,image_mime)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       RETURNING id,slug,name,equipment,primary_muscle AS "primaryMuscle",
+                 secondary_muscles AS "secondaryMuscles",description,instructions,
+                 (image_data IS NOT NULL) AS "hasImage"`,
+      [slug, body.name, body.equipment, body.primaryMuscle.toLowerCase().replace(/\s+/g, '_'), ownerId,
+        body.description, body.secondaryMuscles.map((muscle) => muscle.toLowerCase().replace(/\s+/g, '_')),
+        body.instructions, image, image ? body.imageMime : null],
+    );
+    return reply.status(201).send({ success: true, exercise: result.rows[0] });
+  });
+
+  app.get<{ Params: { exerciseId: string } }>('/exercises/:exerciseId', { preHandler: requireAuth }, async (request, reply) => {
+    const exerciseId = request.params.exerciseId;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(exerciseId)) {
+      return reply.status(400).send({ error: 'Invalid exercise ID.' });
+    }
+    const result = await pool.query(
+      `SELECT id,slug,name,equipment,primary_muscle AS "primaryMuscle",
+              secondary_muscles AS "secondaryMuscles",description,instructions,
+              (image_data IS NOT NULL) AS "hasImage",
+              CASE WHEN image_data IS NULL THEN NULL ELSE encode(image_data,'base64') END AS "imageBase64",
+              image_mime AS "imageMime"
+       FROM strength_exercises WHERE id=$1 AND (owner_id IS NULL OR owner_id=$2)`,
+      [exerciseId, authenticatedUserId(request)],
+    );
+    if (!result.rows[0]) return reply.status(404).send({ error: 'Exercise not found.' });
+    return { success: true, exercise: result.rows[0] };
   });
 
   app.get<{ Params: { exerciseId: string } }>('/exercises/:exerciseId/history', { preHandler: requireAuth }, async (request, reply) => {
@@ -150,8 +224,8 @@ export async function strengthRoutes(app: FastifyInstance) {
 
       const exerciseIds = [...new Set(body.exercises.map((exercise) => exercise.exerciseId))];
       const catalog = await client.query(
-        'SELECT id, name FROM strength_exercises WHERE id = ANY($1::uuid[])',
-        [exerciseIds],
+        'SELECT id, name FROM strength_exercises WHERE id = ANY($1::uuid[]) AND (owner_id IS NULL OR owner_id=$2)',
+        [exerciseIds, userId],
       );
       const exercisesById = new Map(catalog.rows.map((exercise) => [exercise.id, exercise.name]));
       if (exercisesById.size !== exerciseIds.length) {
@@ -242,6 +316,8 @@ export async function strengthRoutes(app: FastifyInstance) {
       const monthly = await client.query(`SELECT COUNT(*)::int count FROM workout_logs WHERE user_id=$1 AND date_trunc('month',completed_at)=date_trunc('month',NOW())`, [userId]);
       await client.query('COMMIT');
 
+      await pool.query('DELETE FROM training_recommendations WHERE user_id=$1 AND plan_date=CURRENT_DATE', [userId]).catch(() => undefined);
+
       const newlyUnlocked = await AchievementService.updateMetric(userId, 'workout_count', count.rows[0].count);
       await Promise.all([
         AchievementService.updateMetric(userId, 'workout_week_count', weekly.rows[0].count),
@@ -270,4 +346,11 @@ export async function strengthRoutes(app: FastifyInstance) {
       client.release();
     }
   });
+}
+
+function isStrengthImage(image: Buffer, mimeType: string): boolean {
+  if (mimeType === 'image/jpeg') return image.length > 3 && image[0] === 0xff && image[1] === 0xd8 && image[image.length - 2] === 0xff && image[image.length - 1] === 0xd9;
+  if (mimeType === 'image/png') return image.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  if (mimeType === 'image/webp') return image.toString('ascii', 0, 4) === 'RIFF' && image.toString('ascii', 8, 12) === 'WEBP';
+  return false;
 }

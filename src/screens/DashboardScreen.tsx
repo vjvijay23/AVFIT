@@ -16,21 +16,21 @@ import {
   Flame,
   Camera,
   ChevronRight,
-  Settings,
   PersonStanding,
   Bike,
   Mountain,
   Footprints,
   Dumbbell,
   Users,
-  Sparkles,
   RefreshCw,
   ExternalLink,
   type LucideIcon,
 } from 'lucide-react-native';
+import Svg, { Circle } from 'react-native-svg';
 import AvfitLogo from '../components/common/AvfitLogo';
 import ProfileAvatar from '../components/common/ProfileAvatar';
 import HealthConnectionsCard from '../components/profile/HealthConnectionsCard';
+import AITrainingCoachCard from '../components/dashboard/AITrainingCoachCard';
 import { AuthService } from '../services/auth';
 import { FitnessProfileService } from '../services/fitnessProfile';
 import { ActivityService } from '../services/activityService';
@@ -46,7 +46,6 @@ export default function DashboardScreen({ navigation }: any) {
   const [fitnessProfile, setFitnessProfile] = useState<FitnessProfile | null>(null);
   const [userStats, setUserStats] = useState<UserFitnessStats | null>(null);
   const [recentActivities, setRecentActivities] = useState<RecordedActivity[]>([]);
-  const [todayMeals, setTodayMeals] = useState<Array<Record<string, any>>>([]);
   const [healthSummary, setHealthSummary] = useState<DailyHealthSummary | null>(null);
   const [healthConnected, setHealthConnected] = useState(false);
   const [trainingRecommendation, setTrainingRecommendation] = useState<Record<string, any> | null>(null);
@@ -57,12 +56,11 @@ export default function DashboardScreen({ navigation }: any) {
   const [stravaSyncing, setStravaSyncing] = useState(false);
 
   const fetchData = async () => {
-    const [userResult, fitnessResult, statsResult, activitiesResult, mealsResult, connectedResult, trainingResult, stravaResult] = await Promise.allSettled([
+    const [userResult, fitnessResult, statsResult, activitiesResult, connectedResult, trainingResult, stravaResult] = await Promise.allSettled([
       AuthService.getUserProfile(),
       FitnessProfileService.getFitnessProfile(),
       ActivityService.getUserStats(),
       ActivityService.getUserActivities(),
-      BackendApi.getMeals(),
       HealthIntegrationService.isConnected(),
       BackendApi.getTrainingRecommendation(),
       BackendApi.getStravaStatus(),
@@ -72,10 +70,6 @@ export default function DashboardScreen({ navigation }: any) {
     if (fitnessResult.status === 'fulfilled') setFitnessProfile(fitnessResult.value);
     if (statsResult.status === 'fulfilled') setUserStats(statsResult.value);
     if (activitiesResult.status === 'fulfilled') setRecentActivities(activitiesResult.value);
-    if (mealsResult.status === 'fulfilled') {
-      const today = localDateKey(new Date());
-      setTodayMeals(mealsResult.value.meals.filter((meal) => meal.logged_at && localDateKey(new Date(meal.logged_at)) === today));
-    }
     if (trainingResult.status === 'fulfilled') {
       setTrainingRecommendation(trainingResult.value.recommendation);
       setTrainingError('');
@@ -109,7 +103,7 @@ export default function DashboardScreen({ navigation }: any) {
     if (userResult.status === 'rejected' && !BackendApi.hasAuthToken()) {
       navigation?.getParent?.()?.reset?.({ index: 0, routes: [{ name: 'AuthWelcome' }] });
     }
-    if ([userResult, fitnessResult, statsResult, activitiesResult, mealsResult].some((result) => result.status === 'rejected')) {
+    if ([userResult, fitnessResult, statsResult, activitiesResult].some((result) => result.status === 'rejected')) {
       console.warn('[Dashboard] Some account progress data could not be refreshed');
     }
   };
@@ -128,17 +122,19 @@ export default function DashboardScreen({ navigation }: any) {
 
   const calorieTarget = fitnessProfile?.dailyCalorieTarget || 2000;
   const proteinTarget = fitnessProfile?.dailyProteinG || 140;
-  const carbsTarget = fitnessProfile?.dailyCarbsG || 220;
-  const fatTarget = fitnessProfile?.dailyFatG || 65;
   const stepTarget = fitnessProfile?.dailyStepGoal || userStats?.todayStepGoal || 8000;
 
-  const foodTotals = todayMeals.reduce((totals, meal) => ({
-    calories: totals.calories + Number(meal.calories || 0),
-    protein: totals.protein + Number(meal.protein_g || 0),
-    carbs: totals.carbs + Number(meal.carbs_g || 0),
-    fat: totals.fat + Number(meal.fat_g || 0),
-  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
   const stepsToday = healthConnected ? (healthSummary?.steps || 0) : (userStats?.todaySteps || 0);
+  const distanceTodayKm = healthConnected
+    ? (healthSummary?.distanceMeters || 0) / 1000
+    : (userStats?.todayDistanceKm || 0);
+  const activityCaloriesToday = healthConnected
+    ? (healthSummary?.activeCalories || 0)
+    : (userStats?.todayCalories || 0);
+  const movementMinutesToday = recentActivities
+    .filter((activity) => new Date(activity.createdAt).toDateString() === new Date().toDateString())
+    .reduce((total, activity) => total + Math.max(0, Math.round(activity.activeDurationSeconds / 60)), 0);
+  const goalLabel = fitnessProfile?.fitnessGoal?.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) || 'Set your goal';
 
   const refreshTraining = async () => {
     setTrainingLoading(true);
@@ -175,7 +171,12 @@ export default function DashboardScreen({ navigation }: any) {
   };
 
   const startRecommendedPlan = () => {
-    if (trainingRecommendation?.activity_type === 'strength') navigation?.navigate?.('Gym');
+    if (trainingRecommendation?.activity_type === 'strength') {
+      navigation?.navigate?.('GymWorkout', { initialWorkout: {
+        name: trainingRecommendation.headline || 'AI Strength Workout',
+        exercises: trainingRecommendation.workout || [],
+      } });
+    }
     else navigation?.navigate?.('Activity', { initialSport: trainingRecommendation?.activity_type === 'run' ? 'running' : 'walking' });
   };
 
@@ -208,14 +209,12 @@ export default function DashboardScreen({ navigation }: any) {
           { paddingBottom: 130 + insets.bottom },
         ]}
       >
-        {/* Greeting & Streak Row */}
+        {/* A short greeting uses saved profile goals instead of generic text. */}
         <View style={styles.greetingRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.greetingTitle}>Hey, {userName}</Text>
             <Text style={styles.greetingSubtitle}>
-              {isNewUser
-                ? 'Your fitness, all in one place.'
-                : `Day ${streakDays} • Goal: ${fitnessProfile?.fitnessGoal === 'weight_loss' ? 'Weight Loss' : 'Muscle Tone'}`}
+              {fitnessProfile ? `${goalLabel} · ${fitnessProfile.fitnessLevel}` : 'Your fitness, at your pace'}
             </Text>
           </View>
           <View style={styles.streakPill}>
@@ -224,73 +223,45 @@ export default function DashboardScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Daily activity and meal progress, based on connected health data and saved food diary entries. */}
+        {/* One simple, profile-based daily activity summary. */}
         <View style={styles.dailyProgressCard}>
           <View style={styles.dailyProgressHeader}>
-            <View>
-              <Text style={styles.dailyProgressTitle}>Today&apos;s progress</Text>
-              <Text style={styles.dailyProgressSubtitle}>Activity and nutrition against your targets</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dailyProgressTitle}>Daily activity</Text>
+              <Text style={styles.dailyProgressSubtitle}>Your movement so far today</Text>
             </View>
-            <View style={styles.progressDayPill}><Text style={styles.progressDayText}>TODAY</Text></View>
+            <Text style={styles.todayLabel}>TODAY</Text>
           </View>
-          <View style={styles.stepProgressRow}>
-            <View style={styles.progressIcon}><Footprints size={18} color={Colors.primary} /></View>
-            <View style={styles.progressMain}>
-              <View style={styles.progressLabelRow}>
-                <Text style={styles.progressLabel}>Steps</Text>
-                <Text style={styles.progressValue}>{stepsToday.toLocaleString()} <Text style={styles.progressTarget}>/ {stepTarget.toLocaleString()}</Text></Text>
-              </View>
-              <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progressPercent(stepsToday, stepTarget)}%`, backgroundColor: Colors.accentOrange }]} /></View>
+          <View style={styles.activitySummaryRow}>
+            <View style={styles.stepRing}>
+              <Svg width={110} height={110} viewBox="0 0 110 110">
+                <Circle cx={55} cy={55} r={45} stroke={Colors.backgroundLight} strokeWidth={9} fill="none" />
+                <Circle cx={55} cy={55} r={45} stroke={Colors.primary} strokeWidth={9} strokeLinecap="round" fill="none" strokeDasharray={`${2 * Math.PI * 45} ${2 * Math.PI * 45}`} strokeDashoffset={2 * Math.PI * 45 * (1 - Math.min(1, stepsToday / Math.max(1, stepTarget)))} rotation={-90} origin="55, 55" />
+              </Svg>
+              <View style={styles.stepRingCenter}><Text style={styles.stepRingValue}>{Math.min(100, Math.round((stepsToday / Math.max(1, stepTarget)) * 100))}%</Text><Text style={styles.stepRingLabel}>STEP GOAL</Text></View>
+            </View>
+            <View style={styles.activityMetricStack}>
+              <ActivityMetric icon={Footprints} label="Steps" value={stepsToday.toLocaleString()} detail={`of ${stepTarget.toLocaleString()}`} styles={styles} />
+              <ActivityMetric icon={PersonStanding} label="Distance" value={`${distanceTodayKm.toFixed(1)} km`} detail="today" styles={styles} />
+              <ActivityMetric icon={Flame} label="Calories" value={`${activityCaloriesToday} kcal`} detail={`${movementMinutesToday} active min`} styles={styles} />
             </View>
           </View>
-          <View style={styles.progressDivider} />
-          <Text style={styles.nutritionProgressHeading}>Food diary</Text>
-          <ProgressMetric label="Calories" current={foodTotals.calories} target={calorieTarget} unit="kcal" color={Colors.accentOrange} styles={styles} />
-          <ProgressMetric label="Protein" current={foodTotals.protein} target={proteinTarget} unit="g" color={Colors.primary} styles={styles} />
-          <ProgressMetric label="Carbs" current={foodTotals.carbs} target={carbsTarget} unit="g" color={Colors.blue} styles={styles} />
-          <ProgressMetric label="Fat" current={foodTotals.fat} target={fatTarget} unit="g" color={Colors.lilac} styles={styles} />
-          <TouchableOpacity style={styles.viewDiaryLink} onPress={() => navigation?.navigate?.('FoodScanner')} accessibilityRole="button">
-            <Text style={styles.viewDiaryText}>{todayMeals.length ? `${todayMeals.length} meal${todayMeals.length === 1 ? '' : 's'} logged` : 'Log your first meal'}</Text>
-            <ChevronRight size={16} color={Colors.primary} />
-          </TouchableOpacity>
         </View>
 
-        <HealthConnectionsCard />
+        {!healthConnected && <HealthConnectionsCard hideWhenConnected />}
 
-        <View style={styles.trainingPlanCard}>
-          <View style={styles.trainingPlanHeader}>
-            <View style={styles.trainingPlanTitleRow}>
-              <View style={styles.trainingPlanIcon}><Sparkles size={17} color={Colors.accentOrange} /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.trainingPlanTitle}>Your AI training plan</Text>
-                <Text style={styles.trainingPlanSubtitle}>Based on your goals, workouts and today&apos;s nutrition</Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={refreshTraining} disabled={trainingLoading} accessibilityLabel="Refresh training plan" style={styles.trainingRefresh}>
-              <RefreshCw size={17} color={Colors.primary} />
-            </TouchableOpacity>
-          </View>
-          {trainingLoading ? <Text style={styles.trainingPlanBody}>Updating your plan…</Text> : trainingRecommendation ? <>
-            <Text style={styles.trainingPlanHeadline}>{trainingRecommendation.headline}</Text>
-            <View style={styles.trainingMetaRow}>
-              <Text style={styles.trainingMetaPill}>{String(trainingRecommendation.activity_type || 'workout').toUpperCase()}</Text>
-              <Text style={styles.trainingMetaText}>{trainingRecommendation.duration_minutes ? `${trainingRecommendation.duration_minutes} min` : 'Rest day'}</Text>
-              <Text style={styles.trainingMetaText}>{trainingRecommendation.intensity}</Text>
-            </View>
-            <Text style={styles.trainingPlanBody}>{trainingRecommendation.reason}</Text>
-            {!!trainingRecommendation.workout?.length && <View style={styles.trainingWorkoutList}>{trainingRecommendation.workout.slice(0, 5).map((item: string, index: number) => <Text key={`${index}-${item}`} style={styles.trainingWorkoutLine}>• {item}</Text>)}</View>}
-            <Text style={styles.trainingPlanBody}><Text style={styles.trainingStrong}>Tomorrow: </Text>{trainingRecommendation.tomorrow}</Text>
-            <Text style={styles.trainingNutritionNote}>{trainingRecommendation.nutrition_note}</Text>
-            {!!trainingRecommendation.roadmap && <View style={styles.trainingRoadmap}>
-              <Text style={styles.trainingRoadmapTitle}>Your {trainingRecommendation.roadmap.months}-month goal roadmap</Text>
-              <Text style={styles.trainingPlanBody}>{trainingRecommendation.roadmap.summary}</Text>
-              {trainingRecommendation.roadmap.milestones?.map((milestone: string, index: number) => <Text key={`${index}-${milestone}`} style={styles.trainingRoadmapMilestone}>• {milestone}</Text>)}
-            </View>}
-            {trainingRecommendation.activity_type !== 'rest' && <TouchableOpacity style={styles.trainingStartButton} onPress={startRecommendedPlan} activeOpacity={0.82}>
-              <Text style={styles.trainingStartText}>Start this plan</Text><ChevronRight size={17} color="#FFFFFF" />
-            </TouchableOpacity>}
-          </> : <Text style={styles.trainingPlanBody}>{trainingError || 'Your plan will appear here once your fitness profile is ready.'}</Text>}
-        </View>
+        <AITrainingCoachCard
+          recommendation={trainingRecommendation}
+          profile={fitnessProfile}
+          loading={trainingLoading}
+          error={trainingError}
+          onRefresh={refreshTraining}
+          onStart={startRecommendedPlan}
+          onProfile={() => navigation?.navigate?.('ProfileEdit')}
+          onNutrition={() => navigation?.navigate?.('DietPlan')}
+          calorieTarget={calorieTarget}
+          proteinTarget={proteinTarget}
+        />
 
         <View style={styles.integrationsCard}>
           <Text style={styles.integrationsHeading}>Connected apps</Text>
@@ -305,32 +276,10 @@ export default function DashboardScreen({ navigation }: any) {
               <ExternalLink size={14} color={Colors.primary} /><Text style={styles.stravaButtonText}>Connect</Text>
             </TouchableOpacity>}
           </View>
-          {stravaActivities.slice(0, 3).map((activity) => <View key={activity.strava_activity_id} style={styles.stravaActivity}>
+          {stravaActivities.slice(0, 1).map((activity) => <View key={activity.strava_activity_id} style={styles.stravaActivity}>
             <Text style={styles.stravaActivityName}>{activity.name}</Text>
             <Text style={styles.stravaActivityMeta}>{activity.sport_type} · {(Number(activity.distance_m || 0) / 1000).toFixed(1)} km · {Math.round(Number(activity.moving_time_sec || 0) / 60)} min</Text>
           </View>)}
-        </View>
-
-        {/* Personalized Nutrition Target Engine */}
-        <View style={styles.nutritionEngineCard}>
-          <View style={styles.nutritionEngineHeader}>
-            <Text style={styles.engineTitle}>Personalized Nutrition Targets</Text>
-            <TouchableOpacity onPress={() => navigation?.navigate?.('ProfileEdit')}>
-              <Settings size={14} color={Colors.primary} />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.nutritionRow}>
-            <View>
-              <Text style={styles.engineVal}>{calorieTarget} kcal</Text>
-              <Text style={styles.engineSub}>Daily Calorie Target</Text>
-            </View>
-            <View style={styles.nutritionPillBadge}>
-              <Text style={styles.nutritionPillText}>{proteinTarget}g Protein</Text>
-            </View>
-          </View>
-          <TouchableOpacity onPress={() => navigation?.navigate?.('DietPlan')} style={{ marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderSubtle }}>
-            <Text style={{ color: Colors.primary, fontSize: 15, fontWeight: '800' }}>Open your personalized 7-day diet chart →</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Simple shortcuts keep the main tools easy to reach without a long goals list. */}
@@ -364,7 +313,7 @@ export default function DashboardScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            {recentActivities.slice(0, 3).map((act) => (
+            {recentActivities.slice(0, 1).map((act) => (
               <TouchableOpacity
                 key={act.id}
                 style={styles.activityItemCard}
@@ -396,33 +345,19 @@ export default function DashboardScreen({ navigation }: any) {
   );
 }
 
-function localDateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function progressPercent(current: number, target: number) {
-  if (!target || target <= 0) return 0;
-  return Math.max(0, Math.min(100, (current / target) * 100));
-}
-
-function ProgressMetric({ label, current, target, unit, color, styles }: {
+function ActivityMetric({ icon: Icon, label, value, detail, styles }: {
+  icon: LucideIcon;
   label: string;
-  current: number;
-  target: number;
-  unit: string;
-  color: string;
+  value: string;
+  detail: string;
   styles: Record<string, any>;
 }) {
-  const currentRounded = Math.round(current);
-  const targetRounded = Math.round(target);
   return (
-    <View style={styles.progressMetric}>
-      <View style={styles.progressLabelRow}>
-        <Text style={styles.progressLabel}>{label}</Text>
-        <Text style={styles.progressValue}>{currentRounded.toLocaleString()} <Text style={styles.progressTarget}>/ {targetRounded.toLocaleString()} {unit}</Text></Text>
-      </View>
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progressPercent(current, target)}%`, backgroundColor: color }]} />
+    <View style={styles.activityMetric}>
+      <View style={styles.activityMetricIcon}><Icon size={16} color={Colors.primary} strokeWidth={2.3} /></View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={styles.activityMetricHeading}><Text style={styles.activityMetricLabel}>{label}</Text><Text numberOfLines={1} style={styles.activityMetricDetail}>{detail}</Text></View>
+        <Text numberOfLines={1} adjustsFontSizeToFit style={styles.activityMetricValue}>{value}</Text>
       </View>
     </View>
   );
@@ -512,33 +447,25 @@ const createStyles = () => ({
     fontWeight: '800',
     color: Colors.accentOrange,
   },
-  dailyProgressCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 22,
-    padding: 17,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
-    marginBottom: 16,
-  },
-  dailyProgressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  dailyProgressTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '900' },
+  dailyProgressCard: { backgroundColor: Colors.surface, borderRadius: 26, padding: 19, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 17, shadowColor: '#000000', shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.12, shadowRadius: 14, elevation: 3 },
+  dailyProgressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  dailyProgressTitle: { color: Colors.textPrimary, fontSize: 19, fontWeight: '900', letterSpacing: -0.2 },
   dailyProgressSubtitle: { color: Colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 3 },
-  progressDayPill: { backgroundColor: Colors.primarySoft, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10 },
-  progressDayText: { color: Colors.primary, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-  stepProgressRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-  progressIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primarySoft },
-  progressMain: { flex: 1 },
-  progressMetric: { marginBottom: 13 },
-  progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 },
-  progressLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '800' },
-  progressValue: { color: Colors.textPrimary, fontSize: 12, fontWeight: '900' },
-  progressTarget: { color: Colors.textMuted, fontWeight: '700' },
-  progressTrack: { height: 8, borderRadius: 8, overflow: 'hidden', backgroundColor: Colors.backgroundLight },
-  progressFill: { height: '100%', borderRadius: 8 },
-  progressDivider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.borderSubtle, marginTop: 15, marginBottom: 13 },
-  nutritionProgressHeading: { color: Colors.textPrimary, fontSize: 13, fontWeight: '900', marginBottom: 12 },
+  todayLabel: { color: Colors.primary, fontSize: 10, fontWeight: '900', letterSpacing: 1.1, backgroundColor: Colors.primarySoft, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, overflow: 'hidden' },
+  activitySummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  stepRing: { width: 110, height: 110, alignItems: 'center', justifyContent: 'center' },
+  stepRingCenter: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  stepRingValue: { color: Colors.textPrimary, fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
+  stepRingLabel: { color: Colors.textMuted, fontSize: 8, fontWeight: '900', letterSpacing: 0.6, marginTop: 2 },
+  activityMetricStack: { flex: 1, gap: 4 },
+  activityMetric: { minHeight: 47, flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderSubtle },
+  activityMetricIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: Colors.primarySoft },
+  activityMetricHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 5 },
+  activityMetricLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: '800' },
+  activityMetricValue: { color: Colors.textPrimary, fontSize: 16, fontWeight: '900', marginTop: 1 },
+  activityMetricDetail: { color: Colors.textMuted, fontSize: 9, fontWeight: '700' },
   trainingPlanCard: { backgroundColor: Colors.surface, borderRadius: 22, padding: 17, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 16 },
-  integrationsCard: { backgroundColor: Colors.surface, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 16 },
+  integrationsCard: { backgroundColor: Colors.surface, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 16, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 2 },
   integrationsHeading: { color: Colors.textPrimary, fontSize: 15, fontWeight: '900', marginBottom: 12 },
   trainingPlanHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   trainingPlanTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
@@ -568,8 +495,6 @@ const createStyles = () => ({
   stravaActivity: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderSubtle, paddingTop: 9, marginTop: 9 },
   stravaActivityName: { color: Colors.textPrimary, fontSize: 12, fontWeight: '800' },
   stravaActivityMeta: { color: Colors.textSecondary, fontSize: 11, marginTop: 2 },
-  viewDiaryLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderSubtle, paddingTop: 11, marginTop: 1 },
-  viewDiaryText: { color: Colors.primary, fontSize: 12, fontWeight: '900' },
   nutritionEngineCard: {
     backgroundColor: '#0D1824',
     borderRadius: 21,
@@ -646,7 +571,7 @@ const createStyles = () => ({
     fontWeight: '800',
     color: Colors.textPrimary,
   },
-  communityRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 72, paddingHorizontal: 14, marginBottom: 18, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderSubtle },
+  communityRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 76, paddingHorizontal: 14, marginBottom: 18, borderRadius: 21, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderSubtle },
   communityIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.surfaceWarm, alignItems: 'center', justifyContent: 'center' },
   communityCard: {
     flexDirection: 'row',

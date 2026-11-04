@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../../theme/ThemeContext';
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
@@ -22,7 +23,7 @@ interface LiveWalkingMapProps {
   height?: number | string;
 }
 
-const STRAVA_ORANGE = '#FC5200';
+const STRAVA_ORANGE = '#2DF461';
 
 export const LiveWalkingMap: React.FC<LiveWalkingMapProps> = ({
   currentLocation,
@@ -32,6 +33,7 @@ export const LiveWalkingMap: React.FC<LiveWalkingMapProps> = ({
   onRecenter,
   height = '100%',
 }) => {
+  const styles = useThemeStyles(createStyles);
   const mapRef = useRef<MapView | null>(null);
   const [autoFollow, setAutoFollow] = useState(true);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -214,11 +216,11 @@ export const LiveWalkingMap: React.FC<LiveWalkingMapProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     width: '100%',
     position: 'relative',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#203846',
     overflow: 'hidden',
   },
   loadingOverlay: {
@@ -232,12 +234,12 @@ const styles = StyleSheet.create({
   loadingTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A202C',
+    color: '#F4F8FA',
     marginTop: 14,
   },
   loadingSubtitle: {
     fontSize: 13,
-    color: '#718096',
+    color: '#91A7B2',
     marginTop: 6,
     textAlign: 'center',
     maxWidth: 280,
@@ -251,7 +253,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.92)',
   },
-  fallbackNoticeText: { color: '#334155', fontSize: 10, fontWeight: '700' },
+  fallbackNoticeText: { color: '#A4B8C1', fontSize: 10, fontWeight: '700' },
   recenterButton: {
     position: 'absolute',
     top: 16,
@@ -259,7 +261,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',
@@ -269,14 +271,14 @@ const styles = StyleSheet.create({
     elevation: 4,
     zIndex: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#203846',
   },
   recenterButtonActive: {
     backgroundColor: STRAVA_ORANGE,
     borderColor: STRAVA_ORANGE,
   },
   startBadge: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#00D7C2',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
@@ -311,7 +313,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',

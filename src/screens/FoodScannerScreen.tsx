@@ -1,3 +1,4 @@
+import { useTheme, useThemeStyles } from '../theme/ThemeContext';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -36,7 +37,7 @@ import {
   X,
 } from 'lucide-react-native';
 
-const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'] as const;
+const MEAL_CATEGORIES = ['Breakfast', 'Lunch', 'Afternoon snack', 'Dinner'] as const;
 type MealCategory = (typeof MEAL_CATEGORIES)[number];
 
 type PreparedFoodImage = { uri: string; base64: string; mimeType: 'image/jpeg' | 'image/png'; width: number; height: number };
@@ -77,6 +78,8 @@ function mealIngredients(value: unknown): Array<Record<string, any>> {
 }
 
 export default function FoodScannerScreen({ navigation }: any) {
+  const styles = useThemeStyles(createStyles);
+  const { mode } = useTheme();
   const insets = useSafeAreaInsets();
   const [isScanning, setIsScanning] = useState(false);
   const [scanStage, setScanStage] = useState('');
@@ -231,7 +234,7 @@ export default function FoodScannerScreen({ navigation }: any) {
         confidence: scannedResult.confidence,
         healthTips: scannedResult.health_tips,
         ingredients: scannedResult.ingredients,
-        mealType: selectedCategory.toLowerCase(),
+        mealType: selectedCategory === 'Afternoon snack' ? 'snack' : selectedCategory.toLowerCase(),
       };
       if (mealId) await BackendApi.updateMeal(mealId, meal);
       else {
@@ -248,14 +251,14 @@ export default function FoodScannerScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={Colors.background} />
 
       {/* Screen Header */}
       <View style={styles.topHeader}>
         <Text style={styles.screenTitle}>AI Food Vision</Text>
         <View style={styles.aiBadge}>
           <Sparkles size={14} color={Colors.primary} />
-          <Text style={styles.aiBadgeText}>Gemini AI Vision</Text>
+          <Text style={styles.aiBadgeText}>AI Food Scan</Text>
         </View>
       </View>
 
@@ -332,7 +335,7 @@ export default function FoodScannerScreen({ navigation }: any) {
 
         {!scannedResult && !isScanning && <View style={styles.resultCard}>
           <Text style={styles.ingredientsTitle}>Nutrition estimate</Text>
-          <Text style={styles.dishSub}>Take a photo or choose one from your gallery. Gemini will estimate the food, portion, and nutrients.</Text>
+          <Text style={styles.dishSub}>Take a photo or choose one from your gallery. AI will estimate the food, portion, and nutrients.</Text>
         </View>}
 
         {/* Scanned Nutrition Results Card */}
@@ -343,7 +346,7 @@ export default function FoodScannerScreen({ navigation }: any) {
               <Text style={styles.dishSub}>Estimated for {portionGrams}g portion • Approximate values</Text>
             </View>
             <View style={styles.confidencePill}>
-              <CheckCircle size={12} color="#16A34A" />
+              <CheckCircle size={12} color="#2DF461" />
               <Text style={styles.confidenceText}>{scannedResult.confidence} confidence</Text>
             </View>
           </View>
@@ -508,8 +511,8 @@ export default function FoodScannerScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  diaryCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, marginTop: 14, borderWidth: 1, borderColor: Colors.borderSubtle },
+const createStyles = () => ({
+  diaryCard: { backgroundColor: '#0D1824', borderRadius: 20, padding: 16, marginTop: 14, borderWidth: 1, borderColor: Colors.borderSubtle },
   signInButton: { alignSelf: 'flex-start', marginTop: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: Colors.primary },
   signInButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
   diarySubTitle: { color: Colors.textSecondary, fontSize: 13, marginTop: 2 },
@@ -520,19 +523,19 @@ const styles = StyleSheet.create({
   mealModalCard: { maxHeight: '82%', backgroundColor: Colors.background, borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 20 },
   mealModalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   mealModalTitle: { fontSize: 21, lineHeight: 27, fontWeight: '900', color: Colors.textPrimary },
-  mealModalClose: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
-  mealCaloriesCard: { backgroundColor: '#E8F1EC', borderRadius: 18, padding: 18, alignItems: 'center', marginBottom: 14 },
+  mealModalClose: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#0D1824', alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
+  mealCaloriesCard: { backgroundColor: '#103B35', borderRadius: 18, padding: 18, alignItems: 'center', marginBottom: 14 },
   mealCaloriesValue: { fontSize: 36, fontWeight: '900', color: Colors.primary },
   mealCaloriesLabel: { color: Colors.primary, fontSize: 12, fontWeight: '900', letterSpacing: 1 },
   mealPortionText: { color: Colors.textSecondary, fontSize: 13, marginTop: 6 },
-  mealMacroGrid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#FFFFFF', borderRadius: 16, paddingVertical: 12, marginBottom: 12 },
+  mealMacroGrid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#0D1824', borderRadius: 16, paddingVertical: 12, marginBottom: 12 },
   mealMacroCell: { width: '50%', alignItems: 'center', paddingVertical: 10 },
   mealMacroValue: { color: Colors.textPrimary, fontSize: 18, fontWeight: '800' },
   mealMacroLabel: { color: Colors.textSecondary, fontSize: 13, marginTop: 3 },
-  mealDetailRows: { backgroundColor: '#FFFFFF', borderRadius: 14, paddingHorizontal: 12 },
+  mealDetailRows: { backgroundColor: '#0D1824', borderRadius: 14, paddingHorizontal: 12 },
   nutrientRows: { marginTop: 4, marginBottom: 10 },
   nutrientRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderSubtle },
-  healthTip: { color: '#59645D', fontSize: 12, lineHeight: 18, backgroundColor: '#EFF5F0', padding: 11, borderRadius: 12, marginVertical: 8 },
+  healthTip: { color: '#A4B8C1', fontSize: 12, lineHeight: 18, backgroundColor: '#103B35', padding: 11, borderRadius: 12, marginVertical: 8 },
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -553,7 +556,7 @@ const styles = StyleSheet.create({
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8F1EC',
+    backgroundColor: '#103B35',
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 14,
@@ -577,10 +580,10 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingVertical: 10,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E8DFC8',
+    borderColor: '#203846',
   },
   categoryPillActive: {
     backgroundColor: Colors.primary,
@@ -596,7 +599,7 @@ const styles = StyleSheet.create({
   },
   cameraBox: {
     height: 250,
-    backgroundColor: '#1C2B22',
+    backgroundColor: '#0D1824',
     borderRadius: 26,
     overflow: 'hidden',
     position: 'relative',
@@ -607,7 +610,7 @@ const styles = StyleSheet.create({
   previewImage: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#1C2B22',
+    backgroundColor: '#0D1824',
   },
   viewfinderCenter: {
     alignItems: 'center',
@@ -616,7 +619,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
@@ -664,12 +667,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     minHeight: 54,
     paddingVertical: 14,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: '#E8DFC8',
+    borderColor: '#203846',
     gap: 6,
   },
   galleryBtnText: {
@@ -678,11 +681,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   resultCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
-    borderColor: '#E8DFC8',
+    borderColor: '#203846',
   },
   dishHeader: {
     flexDirection: 'row',
@@ -703,7 +706,7 @@ const styles = StyleSheet.create({
   confidencePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#103B35',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 12,
@@ -713,13 +716,13 @@ const styles = StyleSheet.create({
   confidenceText: {
     fontSize: 10.5,
     fontWeight: '800',
-    color: '#16A34A',
+    color: '#2DF461',
   },
   caloriesBanner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F9F6F0',
+    backgroundColor: '#050B16',
     borderRadius: 16,
     padding: 14,
     marginBottom: 14,
@@ -744,11 +747,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E8DFC8',
+    borderColor: '#203846',
   },
   portionText: {
     fontSize: 14,
@@ -760,7 +763,7 @@ const styles = StyleSheet.create({
   macroGrid: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3EFE6',
+    backgroundColor: '#12202B',
     borderRadius: 14,
     paddingVertical: 12,
     marginBottom: 16,
@@ -783,7 +786,7 @@ const styles = StyleSheet.create({
   macroDivider: {
     width: 1,
     height: 22,
-    backgroundColor: '#E8DFC8',
+    backgroundColor: '#1A2B36',
   },
   ingredientsTitle: {
     fontSize: 13,
@@ -796,7 +799,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 5,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0EBE1',
+    borderBottomColor: '#1A2B36',
   },
   ingredientName: {
     fontSize: 12.5,
@@ -818,7 +821,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   savedDiaryBtn: {
-    backgroundColor: '#16A34A',
+    backgroundColor: '#2DF461',
   },
   saveDiaryBtnText: {
     color: '#FFFFFF',

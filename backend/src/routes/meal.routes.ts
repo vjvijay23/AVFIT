@@ -22,6 +22,7 @@ export async function mealRoutes(app: FastifyInstance) {
     const userId = authenticatedUserId(request);
     const result = await pool.query(`INSERT INTO meals (user_id,dish_name,portion_grams,calories,protein_g,carbs_g,fat_g,fiber_g,sugars_g,saturated_fat_g,sodium_mg,cholesterol_mg,confidence,health_tips,ingredients,meal_type)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`, [userId,name,body.portionGrams ?? 250,calories,body.proteinG ?? 0,body.carbsG ?? 0,body.fatG ?? 0,body.fiberG ?? 0,body.sugarsG ?? 0,body.saturatedFatG ?? 0,body.sodiumMg ?? 0,body.cholesterolMg ?? 0,body.confidence || 'manual',body.healthTips || null,JSON.stringify(body.ingredients || []),mealType]);
+    await pool.query('DELETE FROM training_recommendations WHERE user_id=$1 AND plan_date=CURRENT_DATE', [userId]).catch(() => undefined);
     const count = await pool.query('SELECT COUNT(*)::int count FROM meals WHERE user_id=$1', [userId]);
     const newlyUnlocked = await AchievementService.updateMetric(userId, 'meal_count', count.rows[0].count);
     const mealDays = await pool.query('SELECT COUNT(DISTINCT logged_at::date)::int count FROM meals WHERE user_id=$1', [userId]);
@@ -42,6 +43,7 @@ export async function mealRoutes(app: FastifyInstance) {
     if (body.mealType && !allowedMeals.includes(body.mealType)) return reply.status(400).send({ error: 'Invalid mealType.' });
     const result = await pool.query(`UPDATE meals SET ${updates.map(([column],i)=>`${column}=$${i+1}`).join(',')} WHERE id=$${updates.length+1} AND user_id=$${updates.length+2} RETURNING *`, [...updates.map(([,value])=>value),request.params.id,authenticatedUserId(request)]);
     if (!result.rows[0]) return reply.status(404).send({ error: 'Meal not found.' });
+    await pool.query('DELETE FROM training_recommendations WHERE user_id=$1 AND plan_date=CURRENT_DATE', [authenticatedUserId(request)]).catch(() => undefined);
     return { success: true, meal: result.rows[0] };
   });
 }

@@ -1,10 +1,11 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowRight, Fingerprint, Lock, ShieldCheck } from 'lucide-react-native';
+import { Activity, ArrowRight, Fingerprint, HeartPulse, Lock, Utensils } from 'lucide-react-native';
 import { Colors } from '../../theme/colors';
 import { AuthService } from '../../services/auth';
 import AvfitLogo from '../../components/common/AvfitLogo';
@@ -17,6 +18,7 @@ const COUNTRY_CODES = [
 ];
 
 export default function LoginScreen({ navigation, route }: any) {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   const initialCountry = COUNTRY_CODES.find((item) => item.code === route?.params?.countryCode) || COUNTRY_CODES[1];
   const [selectedCountry, setSelectedCountry] = useState(initialCountry);
@@ -85,10 +87,19 @@ export default function LoginScreen({ navigation, route }: any) {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 18), paddingBottom: 36 + insets.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.brandRow}><TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}><Text style={styles.backText}>‹</Text></TouchableOpacity><AvfitLogo size={36} showWordmark /><View style={{ width: 42 }} /></View>
-        <View style={styles.card}>
+        <View style={styles.welcomeHero}>
           <View style={styles.iconCircle}><Lock size={28} color={Colors.primary} /></View>
           <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Sign in securely with your four-digit PIN. SMS verification is only needed for account recovery.</Text>
+          <Text style={styles.subtitle}>Your training, nutrition and progress are ready when you are.</Text>
+          <View style={styles.featureRow}>
+            <View style={styles.featureItem}><Activity size={15} color={Colors.accentOrange} /><Text style={styles.featureText}>Workouts</Text></View>
+            <View style={styles.featureItem}><Utensils size={15} color={Colors.accentOrange} /><Text style={styles.featureText}>Nutrition</Text></View>
+            <View style={styles.featureItem}><HeartPulse size={15} color={Colors.accentOrange} /><Text style={styles.featureText}>Progress</Text></View>
+          </View>
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.formIntro}>Sign in with your mobile number and 4-digit PIN.</Text>
 
           {!!error && <AppNoticeCard message={error} tone="error" compact />}
 
@@ -116,33 +127,37 @@ export default function LoginScreen({ navigation, route }: any) {
             {loading && action === 'otp' ? <ActivityIndicator color={Colors.primary} /> : <Text style={styles.recoveryText}>Forgot or don’t have a PIN? Verify by SMS</Text>}
           </TouchableOpacity>
 
-          <View style={styles.signupRow}><Text style={styles.signupText}>New to AVFIT?</Text><TouchableOpacity onPress={() => navigation.navigate('Signup')}><Text style={styles.signupLink}> Create an account</Text></TouchableOpacity></View>
         </View>
-        <View style={styles.securityNote}><ShieldCheck size={17} color={Colors.primary} /><Text style={styles.noteText}>Your PIN is stored as a secure hash. OTP is used only for account verification and recovery.</Text></View>
+        <View style={styles.signupRow}><Text style={styles.signupText}>New to AVFIT?</Text><TouchableOpacity onPress={() => navigation.navigate('Signup')}><Text style={styles.signupLink}> Create an account</Text></TouchableOpacity></View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingHorizontal: 18, gap: 18 },
+  scroll: { paddingHorizontal: 22, gap: 13, flexGrow: 1, justifyContent: 'center' },
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   backButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
   backText: { fontSize: 30, lineHeight: 34, color: Colors.textPrimary },
-  card: { backgroundColor: '#fff', borderRadius: 26, padding: 24, borderWidth: 1, borderColor: Colors.borderSubtle, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  welcomeHero: { alignItems: 'center', paddingTop: 8, paddingBottom: 5 },
   iconCircle: { alignSelf: 'center', width: 62, height: 62, borderRadius: 31, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   title: { fontSize: 27, fontWeight: '900', color: Colors.textPrimary, textAlign: 'center' },
-  subtitle: { fontSize: 15, lineHeight: 22, color: Colors.textSecondary, marginTop: 8, marginBottom: 22, textAlign: 'center' },
+  subtitle: { fontSize: 15, lineHeight: 22, color: Colors.textSecondary, marginTop: 8, marginBottom: 15, textAlign: 'center', maxWidth: 330 },
+  featureRow: { flexDirection: 'row', gap: 9, justifyContent: 'center', flexWrap: 'wrap' },
+  featureItem: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 18, backgroundColor: Colors.surface, paddingHorizontal: 11, paddingVertical: 8 },
+  featureText: { color: Colors.textSecondary, fontSize: 12, fontWeight: '800' },
+  formSection: { backgroundColor: 'transparent', borderRadius: 0, padding: 0, borderWidth: 0 },
+  formIntro: { color: Colors.textSecondary, fontSize: 14, marginBottom: 18, textAlign: 'center' },
   label: { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.45, color: Colors.textPrimary, marginBottom: 8 },
-  phoneRow: { flexDirection: 'row', minHeight: 58, borderRadius: 15, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: '#FAFAF8', overflow: 'hidden' },
+  phoneRow: { flexDirection: 'row', minHeight: 58, borderRadius: 15, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.backgroundLight, overflow: 'hidden' },
   countryButton: { paddingHorizontal: 14, backgroundColor: Colors.surfaceWarm, borderRightWidth: 1, borderRightColor: Colors.border, justifyContent: 'center' },
   countryText: { fontSize: 15, color: Colors.textPrimary, fontWeight: '700' },
   phoneInput: { flex: 1, paddingHorizontal: 15, fontSize: 17, fontWeight: '600', color: Colors.textPrimary },
   countryList: { borderWidth: 1, borderColor: Colors.border, borderRadius: 14, overflow: 'hidden', marginTop: 8 },
   countryItem: { paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
   countryItemText: { color: Colors.textPrimary, fontSize: 15, fontWeight: '600' },
-  pinInput: { minHeight: 62, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 15, backgroundColor: '#FAFAF8', fontSize: 28, letterSpacing: 14, textAlign: 'center', color: Colors.primary, fontWeight: '800', marginBottom: 18 },
+  pinInput: { minHeight: 62, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 15, backgroundColor: Colors.backgroundLight, fontSize: 28, letterSpacing: 14, textAlign: 'center', color: Colors.primary, fontWeight: '800', marginBottom: 18 },
   primaryButton: { minHeight: 58, backgroundColor: Colors.primary, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, shadowColor: Colors.primary, shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
   disabled: { opacity: 0.65 },
   primaryButtonText: { color: '#fff', fontSize: 17, fontWeight: '900' },
@@ -150,7 +165,7 @@ const styles = StyleSheet.create({
   biometricText: { fontSize: 15, fontWeight: '800', color: Colors.primary },
   recoveryButton: { minHeight: 50, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   recoveryText: { color: Colors.primary, fontSize: 14, fontWeight: '800', textAlign: 'center' },
-  signupRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 10 },
+  signupRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 11, paddingVertical: 12 },
   signupText: { fontSize: 14, color: Colors.textSecondary },
   signupLink: { fontSize: 14, color: Colors.primary, fontWeight: '900' },
   securityNote: { flexDirection: 'row', gap: 9, alignItems: 'flex-start', padding: 14, borderWidth: 1, borderColor: Colors.border, borderRadius: 16, backgroundColor: Colors.surfaceWarm },

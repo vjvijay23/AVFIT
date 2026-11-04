@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +8,7 @@ import { Colors } from '../../theme/colors';
 import AvfitLogo from '../../components/common/AvfitLogo';
 
 export default function SetPinScreen({ navigation, route }: any) {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   const [pin, setPin] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -50,7 +52,7 @@ export default function SetPinScreen({ navigation, route }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { padding: 18, gap: 18 },
   brand: { alignItems: 'center' },
@@ -58,10 +60,10 @@ const styles = StyleSheet.create({
   icon: { alignSelf: 'center', width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   title: { textAlign: 'center', color: Colors.textPrimary, fontSize: 25, fontWeight: '900' },
   subtitle: { textAlign: 'center', color: Colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: 8, marginBottom: 22 },
-  error: { backgroundColor: '#FCE7E5', padding: 12, borderRadius: 12, marginBottom: 14 },
+  error: { backgroundColor: '#3B1C28', padding: 12, borderRadius: 12, marginBottom: 14 },
   errorText: { color: Colors.danger, fontWeight: '700', fontSize: 14 },
   label: { color: Colors.textPrimary, fontWeight: '800', fontSize: 13, textTransform: 'uppercase', marginBottom: 8, marginTop: 12 },
-  input: { minHeight: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: '#FAFAF8', color: Colors.primary, fontSize: 27, fontWeight: '800', letterSpacing: 14, textAlign: 'center' },
+  input: { minHeight: 60, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: '#0B1621', color: Colors.primary, fontSize: 27, fontWeight: '800', letterSpacing: 14, textAlign: 'center' },
   button: { flexDirection: 'row', gap: 10, minHeight: 58, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary, borderRadius: 16, marginTop: 22 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
   note: { flexDirection: 'row', gap: 9, padding: 14, borderRadius: 15, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surfaceWarm },

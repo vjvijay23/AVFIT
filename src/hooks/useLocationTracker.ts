@@ -389,11 +389,17 @@ export function useLocationTracker() {
     setRouteCoordinates([]);
     setTotalDistanceKm(0);
     setActiveDurationSec(0);
+    setCurrentLocation(null);
+    setGpsAccuracy(null);
+    setLastUpdateTime(null);
     totalDistanceRef.current = 0;
     activeDurationRef.current = 0;
+    lastAcceptedPoint.current = null;
+    lastGpsSampleAtRef.current = 0;
+    trackingStartedAtRef.current = 0;
     setLivePace('--:-- /km');
     setAvgPace('--:-- /km');
-    lastAcceptedPoint.current = null;
+    isPausedRef.current = false;
     setStatus('ready');
   }, [stopTracking]);
 

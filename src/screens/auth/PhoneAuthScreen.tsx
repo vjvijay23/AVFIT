@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import {
   View,
@@ -33,6 +34,7 @@ const COUNTRY_CODES = [
 ];
 
 export default function PhoneAuthScreen({ navigation, onCodeSent }: PhoneAuthScreenProps) {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   const [selectedCountry, setSelectedCountry] = useState(COUNTRY_CODES[0]);
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -242,7 +244,7 @@ export default function PhoneAuthScreen({ navigation, onCodeSent }: PhoneAuthScr
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -286,7 +288,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 24,
     padding: 22,
     borderWidth: 1,
@@ -313,7 +315,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#3B1C28',
     padding: 10,
     borderRadius: 12,
     marginBottom: 16,
@@ -338,7 +340,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#FAFAF8',
+    backgroundColor: '#0B1621',
     marginBottom: 16,
   },
   countryPickerButton: {
@@ -367,7 +369,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   countryDropdown: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,

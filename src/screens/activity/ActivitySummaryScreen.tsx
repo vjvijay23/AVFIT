@@ -1,3 +1,4 @@
+import { useTheme, useThemeStyles } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import {
   View,
@@ -29,6 +30,7 @@ import GoogleActivityMap from '../../components/map/GoogleActivityMap';
 import InbuiltRouteMap from '../../components/map/InbuiltRouteMap';
 import KilometerSplitsTable from '../../components/activity/KilometerSplitsTable';
 import RaceGapChart from '../../components/activity/RaceGapChart';
+import ActivityShareModal from '../../components/share/ActivityShareModal';
 import {
   ChevronLeft,
   Share2,
@@ -50,6 +52,8 @@ const SPORT_NAMES: Record<SportType, string> = {
 };
 
 export default function ActivitySummaryScreen({ route, navigation }: any) {
+  const styles = useThemeStyles(createStyles);
+  const { mode } = useTheme();
   const insets = useSafeAreaInsets();
   const params = route.params || {};
 
@@ -60,6 +64,7 @@ export default function ActivitySummaryScreen({ route, navigation }: any) {
   const [isSaving, setIsSaving] = useState(false);
   const [unlockedTrophies, setUnlockedTrophies] = useState<AchievementDefinition[]>([]);
   const [currentModalTrophy, setCurrentModalTrophy] = useState<AchievementDefinition | null>(null);
+  const [shareVisible, setShareVisible] = useState(false);
 
   // Stats
   const activeDurationSec = params.activeDurationSec || 0;
@@ -140,7 +145,7 @@ export default function ActivitySummaryScreen({ route, navigation }: any) {
 
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={Colors.background} />
 
       {/* Top Header */}
       <View style={styles.topBar}>
@@ -152,7 +157,7 @@ export default function ActivitySummaryScreen({ route, navigation }: any) {
         <Text style={styles.navTitle}>{SPORT_NAMES[sportType]}</Text>
 
         <View style={styles.navActions}>
-          <TouchableOpacity style={styles.navIconBtn}>
+          <TouchableOpacity style={styles.navIconBtn} onPress={() => setShareVisible(true)} accessibilityRole="button" accessibilityLabel="Share workout">
             <Share2 size={20} color={Colors.textPrimary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.navIconBtn}>
@@ -303,6 +308,22 @@ export default function ActivitySummaryScreen({ route, navigation }: any) {
         </TouchableOpacity>
       </ScrollView>
 
+      <ActivityShareModal
+        visible={shareVisible}
+        onClose={() => setShareVisible(false)}
+        activityType={SPORT_NAMES[sportType] || 'Workout'}
+        title={title.trim() || `${SPORT_NAMES[sportType] || 'Workout'} complete`}
+        subtitle="A new session logged with AVFIT"
+        stats={[
+          { label: 'Distance', value: `${Number(distanceKm).toFixed(2)} km` },
+          { label: 'Duration', value: formatDuration(activeDurationSec) },
+          { label: 'Average pace', value: calcAvgPace().replace(' /km', '') },
+          { label: 'Calories', value: `${caloriesBurned} kcal` },
+        ]}
+        caption={`${title.trim() || SPORT_NAMES[sportType] || 'Workout'} complete with AVFIT — ${Number(distanceKm).toFixed(2)} km in ${formatDuration(activeDurationSec)}.`}
+        routePoints={routePoints}
+      />
+
       {/* Trophy Unlock Celebration Modal */}
       {currentModalTrophy && (
         <TrophyUnlockModal
@@ -315,7 +336,7 @@ export default function ActivitySummaryScreen({ route, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -441,7 +462,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   statGridCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
@@ -505,7 +526,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
     borderRadius: 12,

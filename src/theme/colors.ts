@@ -1,48 +1,73 @@
-/**
- * FitPulse Design Tokens
- * Directly inspired by modern organic fitness editorial aesthetics:
- * Warm Oat & Cream surfaces, Deep Forest Green accents, Terracotta Orange callouts, and Floating Charcoal Navigation.
- */
-export const Colors = {
-  // Backgrounds & Surfaces (Warm Natural Cream & Oatmeal)
-  background: '#F9F6F0',        // Warm Cream canvas
-  backgroundLight: '#FAF8F4',
-  surface: '#FFFFFF',           // Crisp White Card
-  surfaceWarm: '#F3EDE2',       // Warm Oat / Beige Card
-  surfaceMuted: '#EAE2D5',      // Soft Divider / Progress track
-  border: '#E8DFC8',            // Soft Organic Border
-  borderSubtle: '#F0E8DC',
+export type ThemeMode = 'dark' | 'light';
 
-  // Brand Accents (Forest Green & Nature Botanical)
-  primary: '#244A32',           // Deep Forest Green
-  primaryDark: '#173322',       // Dark Pine Green
-  primaryLight: '#3A6B4C',      // Sage / Olive Green
-  primarySoft: '#E8F1EC',       // 10% Forest Green tint
+const palettes = {
+  dark: {
+    background: '#050B16',
+    backgroundLight: '#09131E',
+    surface: '#0D1824',
+    surfaceWarm: '#12202B',
+    surfaceMuted: '#1A2B36',
+    border: '#203846',
+    borderSubtle: '#172B37',
+    primary: '#008775',
+    primaryDark: '#006B5D',
+    primaryLight: '#2DF461',
+    primarySoft: '#103B35',
+    accent: '#2DF461',
+    accentOrange: '#00D7C2',
+    accentSoft: '#10362F',
+    accentYellow: '#A4F45B',
+    cyan: '#00D7C2',
+    blue: '#63B9D1',
+    lilac: '#B69CFF',
+    navbarBackground: '#030812',
+    navbarActiveIcon: '#00BFA2',
+    navbarActiveBadge: '#E9FFF8',
+    textPrimary: '#F4F8FA',
+    textSecondary: '#AFC0C9',
+    textMuted: '#8AA0AA',
+    textLight: '#F4F8FA',
+    success: '#2DF461',
+    warning: '#FFD166',
+    danger: '#FF647C',
+  },
+  light: {
+    background: '#F3F8FA',
+    backgroundLight: '#EAF2F4',
+    surface: '#FFFFFF',
+    surfaceWarm: '#EDF5F2',
+    surfaceMuted: '#DFE9EC',
+    border: '#C9D9DE',
+    borderSubtle: '#DDE8EB',
+    primary: '#007968',
+    primaryDark: '#006456',
+    primaryLight: '#00A889',
+    primarySoft: '#DCF5ED',
+    accent: '#159A44',
+    accentOrange: '#009D91',
+    accentSoft: '#DFF5F0',
+    accentYellow: '#6B9F24',
+    cyan: '#008E87',
+    blue: '#287D9A',
+    lilac: '#7455AE',
+    navbarBackground: '#FFFFFF',
+    navbarActiveIcon: '#007968',
+    navbarActiveBadge: '#DCF5ED',
+    textPrimary: '#15262F',
+    textSecondary: '#405963',
+    textMuted: '#5E747D',
+    textLight: '#F4F8FA',
+    success: '#14863B',
+    warning: '#9A6200',
+    danger: '#C53650',
+  },
+} as const;
 
-  // Energetic Callouts (Warm Terracotta / Sunset Orange)
-  accent: '#E07A5F',            // Terracotta Flame
-  accentOrange: '#EB7142',      // Vibrant Orange (Active chart bar & streak badge)
-  accentSoft: '#FDF1EC',        // 10% Terracotta tint
-  accentYellow: '#F4A261',
+export type ThemeColors = { [K in keyof typeof palettes.dark]: string };
+export let Colors: ThemeColors = palettes.dark;
 
-  // Secondary Accents (Cyan / Blue / Lilac for metrics)
-  cyan: '#2A9D8F',
-  blue: '#4A7C9B',
-  lilac: '#9B72AA',
+export function setColorScheme(mode: ThemeMode) {
+  Colors = palettes[mode];
+}
 
-  // Floating Navigation Bar (Dark Charcoal / Espresso)
-  navbarBackground: '#161A17',   // Deep Charcoal Dock
-  navbarActiveIcon: '#244A32',   // Forest Green active icon
-  navbarActiveBadge: '#FFFFFF',  // White circular badge
-
-  // Typography (Charcoal & Warm Grey)
-  textPrimary: '#191C1A',        // Deep Charcoal for high contrast readability
-  textSecondary: '#6B726C',      // Muted Sage Grey for secondary labels
-  textMuted: '#949B95',          // Light Grey for dates & timestamps
-  textLight: '#FAF8F4',
-
-  // Health Status Indicators
-  success: '#2E7D32',
-  warning: '#ED6C02',
-  danger: '#D32F2F',
-};
+export const ColorSchemes = palettes;

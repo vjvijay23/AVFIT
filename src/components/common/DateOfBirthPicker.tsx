@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
@@ -30,6 +31,7 @@ function asIsoDate(date: Date): string {
 }
 
 export default function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
+  const styles = useThemeStyles(createStyles);
   const initialDate = useMemo(() => {
     if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
       const [year, month, day] = value.split('-').map(Number);
@@ -159,7 +161,7 @@ export default function DateOfBirthPicker({ value, onChange }: DateOfBirthPicker
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   field: {
     minHeight: 50,
     flexDirection: 'row',
@@ -168,13 +170,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: '#FAFAF8',
+    backgroundColor: '#0B1621',
     paddingHorizontal: 14,
   },
   fieldText: { flex: 1, fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
   placeholder: { color: Colors.textSecondary },
   scrim: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(16, 28, 21, 0.42)', padding: 22 },
-  modalCard: { width: '100%', maxWidth: 390, maxHeight: '88%', backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.18, shadowRadius: 24, elevation: 12 },
+  modalCard: { width: '100%', maxWidth: 390, maxHeight: '88%', backgroundColor: '#0D1824', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.18, shadowRadius: 24, elevation: 12 },
   modalTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
   modalEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1, color: Colors.textSecondary, marginBottom: 4 },
   modalTitle: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },

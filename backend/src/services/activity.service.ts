@@ -107,6 +107,8 @@ export class ActivityService {
       client.release();
     }
 
+    await pool.query('DELETE FROM training_recommendations WHERE user_id=$1 AND plan_date=CURRENT_DATE', [data.userId]).catch(() => undefined);
+
     // Update Redis Leaderboards for real-time Strava-style rankings
     try {
       const distanceMeters = Math.round(data.distanceKm * 1000);

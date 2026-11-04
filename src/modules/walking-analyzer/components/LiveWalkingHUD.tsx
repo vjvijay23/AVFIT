@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../../theme/ThemeContext';
 import React from 'react';
 import {
   View,
@@ -26,7 +27,7 @@ interface LiveWalkingHUDProps {
   onFinish: () => void;
 }
 
-const STRAVA_ORANGE = '#FC5200';
+const STRAVA_ORANGE = '#2DF461';
 
 export const LiveWalkingHUD: React.FC<LiveWalkingHUDProps> = ({
   status,
@@ -36,6 +37,7 @@ export const LiveWalkingHUD: React.FC<LiveWalkingHUDProps> = ({
   onResume,
   onFinish,
 }) => {
+  const styles = useThemeStyles(createStyles);
   // GPS Accuracy badge helper
   const renderGpsBadge = () => {
     const accuracy = telemetry.gpsAccuracy;
@@ -107,7 +109,7 @@ export const LiveWalkingHUD: React.FC<LiveWalkingHUDProps> = ({
         {/* Distance Card */}
         <View style={styles.metricCard}>
           <View style={styles.metricCardHeader}>
-            <TrendingUp size={14} color="#718096" />
+            <TrendingUp size={14} color="#91A7B2" />
             <Text style={styles.cardHeaderLabel}>DISTANCE</Text>
           </View>
           <Text style={styles.cardValue}>{telemetry.formattedDistance}</Text>
@@ -116,7 +118,7 @@ export const LiveWalkingHUD: React.FC<LiveWalkingHUDProps> = ({
         {/* Live Pace Card */}
         <View style={styles.metricCard}>
           <View style={styles.metricCardHeader}>
-            <Activity size={14} color="#718096" />
+            <Activity size={14} color="#91A7B2" />
             <Text style={styles.cardHeaderLabel}>PACE</Text>
           </View>
           <Text style={styles.cardValue}>{telemetry.formattedPace}</Text>
@@ -174,9 +176,9 @@ export const LiveWalkingHUD: React.FC<LiveWalkingHUDProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   hudContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -197,7 +199,7 @@ const styles = StyleSheet.create({
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#101D29',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
   statusLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#334155',
+    color: '#A4B8C1',
     letterSpacing: 0.5,
   },
   accuracyBadge: {
@@ -234,11 +236,11 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     marginRight: 5,
   },
   accuracyGood: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#00D7C2',
   },
   accuracyFair: {
     backgroundColor: '#F59E0B',
@@ -265,14 +267,14 @@ const styles = StyleSheet.create({
   metricLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#91A7B2',
     letterSpacing: 1,
     marginBottom: 2,
   },
   primaryMetricValue: {
     fontSize: 44,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#F4F8FA',
     fontVariant: ['tabular-nums'],
     letterSpacing: -1,
   },
@@ -284,13 +286,13 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#0D1824',
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#203846',
   },
   metricCardHeader: {
     flexDirection: 'row',
@@ -301,13 +303,13 @@ const styles = StyleSheet.create({
   cardHeaderLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#91A7B2',
     letterSpacing: 0.5,
   },
   cardValue: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#F4F8FA',
     fontVariant: ['tabular-nums'],
   },
   controlsRow: {
@@ -363,10 +365,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   resumeButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#00D7C2',
   },
   finishButton: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#050B16',
   },
   dualButtonText: {
     color: '#FFFFFF',

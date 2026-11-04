@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, {
@@ -20,6 +21,7 @@ interface RaceGapChartProps {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function RaceGapChart({ data, distanceKm = 10 }: RaceGapChartProps) {
+  const styles = useThemeStyles(createStyles);
   const chartWidth = SCREEN_WIDTH - 64;
   const chartHeight = 170;
 
@@ -85,8 +87,8 @@ export default function RaceGapChart({ data, distanceKm = 10 }: RaceGapChartProp
       <Svg width={chartWidth} height={chartHeight} style={styles.svg}>
         <Defs>
           <LinearGradient id="refAreaGradient" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor="#EA580C" stopOpacity="0.25" />
-            <Stop offset="100%" stopColor="#EA580C" stopOpacity="0.02" />
+            <Stop offset="0%" stopColor="#FFD166" stopOpacity="0.25" />
+            <Stop offset="100%" stopColor="#FFD166" stopOpacity="0.02" />
           </LinearGradient>
         </Defs>
 
@@ -97,23 +99,23 @@ export default function RaceGapChart({ data, distanceKm = 10 }: RaceGapChartProp
         <Line x1={25} y1={zeroY + 25} x2={chartWidth - 10} y2={zeroY + 25} stroke="#E2E8F0" strokeWidth={1} strokeDasharray="3,3" />
 
         {/* Y-Axis Labels */}
-        <SvgText x={10} y={zeroY - 58} fontSize={9} fill="#94A3B8">20</SvgText>
-        <SvgText x={10} y={zeroY - 28} fontSize={9} fill="#94A3B8">10</SvgText>
-        <SvgText x={15} y={zeroY + 3} fontSize={9} fill="#64748B" fontWeight="bold">0</SvgText>
-        <SvgText x={12} y={zeroY + 28} fontSize={9} fill="#94A3B8">-5</SvgText>
+        <SvgText x={10} y={zeroY - 58} fontSize={9} fill="#91A7B2">20</SvgText>
+        <SvgText x={10} y={zeroY - 28} fontSize={9} fill="#91A7B2">10</SvgText>
+        <SvgText x={15} y={zeroY + 3} fontSize={9} fill="#91A7B2" fontWeight="bold">0</SvgText>
+        <SvgText x={12} y={zeroY + 28} fontSize={9} fill="#91A7B2">-5</SvgText>
 
         {/* Bars: Red positive (+ahead), Blue negative (-behind) */}
         {/* Lap 2: +00:08 (Red bar) */}
-        <Rect x={80} y={zeroY - 34} width={18} height={34} fill="#DC2626" rx={2} />
-        <SvgText x={89} y={zeroY - 37} fontSize={7} fill="#DC2626" textAnchor="middle">+00:08</SvgText>
+        <Rect x={80} y={zeroY - 34} width={18} height={34} fill="#FF647C" rx={2} />
+        <SvgText x={89} y={zeroY - 37} fontSize={7} fill="#FF647C" textAnchor="middle">+00:08</SvgText>
 
         {/* Lap 4: +00:02 (Red bar) */}
-        <Rect x={135} y={zeroY - 14} width={18} height={14} fill="#DC2626" rx={2} />
-        <SvgText x={144} y={zeroY - 17} fontSize={7} fill="#DC2626" textAnchor="middle">+00:02</SvgText>
+        <Rect x={135} y={zeroY - 14} width={18} height={14} fill="#FF647C" rx={2} />
+        <SvgText x={144} y={zeroY - 17} fontSize={7} fill="#FF647C" textAnchor="middle">+00:02</SvgText>
 
         {/* Lap 5: +00:04 (Red bar) */}
-        <Rect x={180} y={zeroY - 24} width={18} height={24} fill="#DC2626" rx={2} />
-        <SvgText x={189} y={zeroY - 27} fontSize={7} fill="#DC2626" textAnchor="middle">+00:04</SvgText>
+        <Rect x={180} y={zeroY - 24} width={18} height={24} fill="#FF647C" rx={2} />
+        <SvgText x={189} y={zeroY - 27} fontSize={7} fill="#FF647C" textAnchor="middle">+00:04</SvgText>
 
         {/* Lap 6: -00:06 (Blue bar) */}
         <Rect x={215} y={zeroY} width={18} height={24} fill="#0284C7" rx={2} />
@@ -128,30 +130,30 @@ export default function RaceGapChart({ data, distanceKm = 10 }: RaceGapChartProp
         <SvgText x={284} y={zeroY + 27} fontSize={7} fill="#0284C7" textAnchor="middle">-00:04</SvgText>
 
         {/* Lap 10: +00:03 (Red bar) */}
-        <Rect x={305} y={zeroY - 18} width={14} height={18} fill="#DC2626" rx={2} />
-        <SvgText x={312} y={zeroY - 21} fontSize={7} fill="#DC2626" textAnchor="middle">+00:03</SvgText>
+        <Rect x={305} y={zeroY - 18} width={14} height={18} fill="#FF647C" rx={2} />
+        <SvgText x={312} y={zeroY - 21} fontSize={7} fill="#FF647C" textAnchor="middle">+00:03</SvgText>
 
         {/* Shaded Area under Reference Line */}
         <Path d={areaPath} fill="url(#refAreaGradient)" />
 
         {/* Time to Reference Orange Trend Line */}
-        <Path d={linePath} stroke="#EA580C" strokeWidth={2} fill="none" />
+        <Path d={linePath} stroke="#FFD166" strokeWidth={2} fill="none" />
 
         {/* Circle data points along the line */}
         {linePoints.map((pt, i) => (
-          <Circle key={`lp_${i}`} cx={pt.x} cy={pt.y} r={3} fill="#FFFFFF" stroke="#EA580C" strokeWidth={1.5} />
+          <Circle key={`lp_${i}`} cx={pt.x} cy={pt.y} r={3} fill="#FFFFFF" stroke="#FFD166" strokeWidth={1.5} />
         ))}
 
         {/* X-Axis Labels */}
-        <SvgText x={30} y={chartHeight - 4} fontSize={8} fill="#94A3B8">0</SvgText>
-        <SvgText x={90} y={chartHeight - 4} fontSize={8} fill="#94A3B8">2k</SvgText>
-        <SvgText x={150} y={chartHeight - 4} fontSize={8} fill="#94A3B8">4k</SvgText>
-        <SvgText x={210} y={chartHeight - 4} fontSize={8} fill="#94A3B8">6k</SvgText>
-        <SvgText x={270} y={chartHeight - 4} fontSize={8} fill="#94A3B8">8k</SvgText>
-        <SvgText x={315} y={chartHeight - 4} fontSize={8} fill="#94A3B8">10k</SvgText>
+        <SvgText x={30} y={chartHeight - 4} fontSize={8} fill="#91A7B2">0</SvgText>
+        <SvgText x={90} y={chartHeight - 4} fontSize={8} fill="#91A7B2">2k</SvgText>
+        <SvgText x={150} y={chartHeight - 4} fontSize={8} fill="#91A7B2">4k</SvgText>
+        <SvgText x={210} y={chartHeight - 4} fontSize={8} fill="#91A7B2">6k</SvgText>
+        <SvgText x={270} y={chartHeight - 4} fontSize={8} fill="#91A7B2">8k</SvgText>
+        <SvgText x={315} y={chartHeight - 4} fontSize={8} fill="#91A7B2">10k</SvgText>
 
         {/* X-Axis Title */}
-        <SvgText x={chartWidth / 2} y={chartHeight - 4} fontSize={8} fill="#64748B" textAnchor="middle">
+        <SvgText x={chartWidth / 2} y={chartHeight - 4} fontSize={8} fill="#91A7B2" textAnchor="middle">
           Distance (m)
         </SvgText>
       </Svg>
@@ -159,14 +161,14 @@ export default function RaceGapChart({ data, distanceKm = 10 }: RaceGapChartProp
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 16,
     padding: 16,
     marginVertical: 12,
     borderWidth: 1,
-    borderColor: '#F1EFE9',
+    borderColor: '#172B37',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -176,7 +178,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#F4F8FA',
     marginBottom: 8,
     letterSpacing: -0.2,
   },
@@ -192,7 +194,7 @@ const styles = StyleSheet.create({
   legendLineMarker: {
     width: 14,
     height: 3,
-    backgroundColor: '#EA580C',
+    backgroundColor: '#FFD166',
     borderRadius: 2,
     marginRight: 6,
   },
@@ -205,7 +207,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 10,
-    color: '#64748B',
+    color: '#91A7B2',
     fontWeight: '600',
   },
   svg: {

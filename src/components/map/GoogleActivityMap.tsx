@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -31,6 +32,7 @@ export default function GoogleActivityMap({
   onRecenter,
   height = '100%',
 }: GoogleActivityMapProps) {
+  const styles = useThemeStyles(createStyles);
   const mapRef = useRef<MapView | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -64,7 +66,7 @@ export default function GoogleActivityMap({
   // switch to the in-app route map instead of leaving a blank map surface.
   useEffect(() => {
     if (mapLoaded || hasMapError) return;
-    const timeout = setTimeout(() => setHasMapError(true), 7000);
+    const timeout = setTimeout(() => setHasMapError(true), 12000);
     return () => clearTimeout(timeout);
   }, [mapLoaded, hasMapError]);
 
@@ -202,11 +204,11 @@ export default function GoogleActivityMap({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     width: '100%',
     position: 'relative',
-    backgroundColor: '#EAE5D9',
+    backgroundColor: '#12202B',
     overflow: 'hidden',
   },
   loadingOverlay: {
@@ -237,7 +239,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -265,7 +267,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',

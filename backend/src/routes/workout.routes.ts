@@ -40,6 +40,7 @@ export async function workoutRoutes(app: FastifyInstance) {
       const weekly = await client.query(`SELECT COUNT(*)::int count FROM workout_logs WHERE user_id=$1 AND date_trunc('week',completed_at)=date_trunc('week',NOW())`, [userId]);
       const monthly = await client.query(`SELECT COUNT(*)::int count FROM workout_logs WHERE user_id=$1 AND date_trunc('month',completed_at)=date_trunc('month',NOW())`, [userId]);
       await client.query('COMMIT');
+      await pool.query('DELETE FROM training_recommendations WHERE user_id=$1 AND plan_date=CURRENT_DATE', [userId]).catch(() => undefined);
       const newlyUnlocked = await AchievementService.updateMetric(userId, 'workout_count', count.rows[0].count);
       await Promise.all([
         AchievementService.updateMetric(userId, 'workout_week_count', weekly.rows[0].count),

@@ -1,3 +1,4 @@
+import { useTheme, useThemeStyles } from '../../theme/ThemeContext';
 import React from 'react';
 import {
   View,
@@ -12,13 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
 import AvfitLogo from '../../components/common/AvfitLogo';
 import {
-  Footprints,
-  Camera,
-  Heart,
-  Trophy,
+  Activity,
   ArrowRight,
-  ShieldCheck,
-  Sparkles,
 } from 'lucide-react-native';
 
 interface AuthWelcomeScreenProps {
@@ -26,10 +22,12 @@ interface AuthWelcomeScreenProps {
 }
 
 export default function AuthWelcomeScreen({ navigation }: AuthWelcomeScreenProps) {
+  const styles = useThemeStyles(createStyles);
+  const { mode } = useTheme();
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={Colors.background} />
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
@@ -37,66 +35,19 @@ export default function AuthWelcomeScreen({ navigation }: AuthWelcomeScreenProps
         {/* Brand Header */}
         <View style={styles.header}>
           <AvfitLogo size={52} showWordmark={true} />
-          <View style={styles.badgePill}>
-            <Sparkles size={12} color={Colors.accentOrange} />
-            <Text style={styles.badgePillText}>ALL-IN-ONE FITNESS ECOSYSTEM</Text>
-          </View>
         </View>
 
         {/* Hero Visual Block */}
         <View style={styles.heroCard}>
           <View style={styles.heroCenterGraphic}>
             <View style={styles.athleteBadge}>
-              <Text style={{ fontSize: 44 }}>🏃‍♂️</Text>
+              <Activity size={36} color={Colors.primary} strokeWidth={2.5} />
             </View>
           </View>
-          <Text style={styles.heroTitle}>Your Complete Fitness Journey, Unified.</Text>
+          <Text style={styles.heroTitle}>Fitness, made simple.</Text>
           <Text style={styles.heroSubtitle}>
-            Replace multiple disjointed apps with one integrated community experience for movement, nutrition, and daily habits.
+            Track workouts, meals, and progress in one place.
           </Text>
-        </View>
-
-        {/* 4 Feature Highlights */}
-        <View style={styles.featuresList}>
-          <View style={styles.featureItem}>
-            <View style={[styles.featureIconBox, { backgroundColor: '#E8F1EC' }]}>
-              <Footprints size={18} color={Colors.primary} />
-            </View>
-            <View style={styles.featureTextBox}>
-              <Text style={styles.featureTitle}>Step & Activity Tracking</Text>
-              <Text style={styles.featureSub}>Daily streaks, GPS distance, and Strava-inspired leaderboards</Text>
-            </View>
-          </View>
-
-          <View style={styles.featureItem}>
-            <View style={[styles.featureIconBox, { backgroundColor: '#FDF1EC' }]}>
-              <Camera size={18} color={Colors.accentOrange} />
-            </View>
-            <View style={styles.featureTextBox}>
-              <Text style={styles.featureTitle}>AI Food Scanner & Macros</Text>
-              <Text style={styles.featureSub}>Meal calories, macros, and a personalized weekly diet chart</Text>
-            </View>
-          </View>
-
-          <View style={styles.featureItem}>
-            <View style={[styles.featureIconBox, { backgroundColor: '#EAE1D3' }]}>
-              <Heart size={18} color={Colors.primary} />
-            </View>
-            <View style={styles.featureTextBox}>
-              <Text style={styles.featureTitle}>Personalized Home Workouts</Text>
-              <Text style={styles.featureSub}>Adaptive routines with rest countdowns and minimal equipment</Text>
-            </View>
-          </View>
-
-          <View style={styles.featureItem}>
-            <View style={[styles.featureIconBox, { backgroundColor: '#FEF9C3' }]}>
-              <Trophy size={18} color="#A16207" />
-            </View>
-            <View style={styles.featureTextBox}>
-              <Text style={styles.featureTitle}>Gamified 5-Tier Trophy Room</Text>
-              <Text style={styles.featureSub}>Unlock Bronze, Silver, Gold, Platinum, and Diamond badges</Text>
-            </View>
-          </View>
         </View>
 
         {/* Action Buttons */}
@@ -122,19 +73,12 @@ export default function AuthWelcomeScreen({ navigation }: AuthWelcomeScreenProps
 
         </View>
 
-        {/* Security Assurance */}
-        <View style={styles.securityRow}>
-          <ShieldCheck size={14} color={Colors.primary} />
-          <Text style={styles.securityText}>
-            MSG91 verifies your number. Use a PIN for routine sign-in and OTP only for recovery.
-          </Text>
-        </View>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -146,7 +90,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 30,
   },
   badgePill: {
     flexDirection: 'row',
@@ -167,13 +111,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   heroCard: {
-    backgroundColor: '#F3EDE2',
+    backgroundColor: Colors.surface,
     borderRadius: 24,
-    padding: 20,
+    padding: 24,
     alignItems: 'center',
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.borderSubtle,
   },
   heroCenterGraphic: {
     marginBottom: 12,
@@ -182,7 +126,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -212,7 +156,7 @@ const styles = StyleSheet.create({
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     padding: 12,
     borderRadius: 18,
     borderWidth: 1,
@@ -266,7 +210,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
     paddingVertical: 15,
     borderRadius: 18,
     borderWidth: 1.5,

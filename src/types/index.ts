@@ -336,6 +336,7 @@ export interface UserFitnessStats {
   streakDays: number;
   todaySteps: number;
   todayStepGoal: number;
+  todayDistanceKm: number;
   todayCalories: number;
   todayWaterMl: number;
   todayWaterGoalMl: number;

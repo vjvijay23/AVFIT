@@ -3,10 +3,14 @@
 buildscript {
     ext {
         buildToolsVersion = findProperty('android.buildToolsVersion') ?: '34.0.0'
-        minSdkVersion = Integer.parseInt(findProperty('android.minSdkVersion') ?: '23')
-        compileSdkVersion = Integer.parseInt(findProperty('android.compileSdkVersion') ?: '34')
+        // Health Connect requires Android 8.0 (API 26) or newer.
+        minSdkVersion = Integer.parseInt(findProperty('android.minSdkVersion') ?: '26')
+        compileSdkVersion = Integer.parseInt(findProperty('android.compileSdkVersion') ?: '35')
         targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '34')
         kotlinVersion = findProperty('android.kotlinVersion') ?: '1.9.23'
+        // Keep the GPS module's compile-time API aligned with react-native-maps,
+        // which resolves play-services-location 21.0.1 at runtime.
+        playServicesLocationVersion = '21.0.1'
 
         ndkVersion = "26.1.10909125"
     }
@@ -15,7 +19,8 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath('com.android.tools.build:gradle')
+        // Health Connect's client library requires API 35 at compile time.
+        classpath('com.android.tools.build:gradle:8.6.1')
         classpath('com.facebook.react:react-native-gradle-plugin')
         classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
     }

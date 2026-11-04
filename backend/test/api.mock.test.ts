@@ -204,6 +204,44 @@ test('workout catalogue returns a mocked database row', async () => {
   assert.deepEqual(response.json(), { success: true, count: 1, workouts });
 });
 
+test('custom strength exercises require authentication', async () => {
+  let queryCount = 0;
+  queryHandler = async () => { queryCount += 1; return { rows: [], rowCount: 0 }; };
+  const response = await app.inject({ method: 'GET', url: '/api/v1/strength/my-exercises' });
+  assert.equal(response.statusCode, 401);
+  assert.equal(queryCount, 0);
+});
+
+test('custom strength exercise creation persists metadata and optional image for its owner', async () => {
+  let insertParams: any[] = [];
+  const exerciseId = '33333333-3333-4333-8333-333333333333';
+  queryHandler = async (sql: string, params: any[]) => {
+    assert.match(sql, /INSERT INTO strength_exercises/);
+    insertParams = params;
+    return { rows: [{ id: exerciseId, slug: params[0], name: params[1], equipment: params[2], primaryMuscle: 'chest', secondaryMuscles: ['triceps'], description: 'Slow press', instructions: ['Lower with control'], hasImage: true }], rowCount: 1 };
+  };
+  const response = await app.inject({
+    method: 'POST', url: '/api/v1/strength/exercises', headers: { authorization: `Bearer ${bearerToken()}` },
+    payload: { name: 'Floor press', equipment: 'dumbbell', primaryMuscle: 'chest', secondaryMuscles: ['triceps'], description: 'Slow press', instructions: ['Lower with control'], imageBase64: 'iVBORw0KGgo=', imageMime: 'image/png' },
+  });
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().exercise.id, exerciseId);
+  assert.equal(insertParams[4], mockUserId);
+  assert.equal(Buffer.isBuffer(insertParams[8]), true);
+  assert.equal(insertParams[9], 'image/png');
+});
+
+test('custom strength exercise details are owner-scoped', async () => {
+  let queryParams: any[] = [];
+  queryHandler = async (_sql: string, params: any[]) => { queryParams = params; return { rows: [], rowCount: 0 }; };
+  const response = await app.inject({
+    method: 'GET', url: '/api/v1/strength/exercises/33333333-3333-4333-8333-333333333333',
+    headers: { authorization: `Bearer ${bearerToken()}` },
+  });
+  assert.equal(response.statusCode, 404);
+  assert.equal(queryParams[1], mockUserId);
+});
+
 test('walking leaderboard returns mocked service results', async () => {
   const original = LeaderboardService.getWalkingLeaderboard;
   LeaderboardService.getWalkingLeaderboard = async () => ([

@@ -1,3 +1,4 @@
+import { useTheme, useThemeStyles } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import {
   View,
@@ -26,7 +27,7 @@ import { LiveWalkingMap } from './components/LiveWalkingMap';
 import { LiveWalkingHUD } from './components/LiveWalkingHUD';
 import { WalkingSummary } from './types';
 
-const STRAVA_ORANGE = '#FC5200';
+const STRAVA_ORANGE = '#2DF461';
 
 interface LiveWalkingAnalyzerScreenProps {
   navigation?: any;
@@ -35,6 +36,8 @@ interface LiveWalkingAnalyzerScreenProps {
 export const LiveWalkingAnalyzerScreen: React.FC<LiveWalkingAnalyzerScreenProps> = ({
   navigation,
 }) => {
+  const styles = useThemeStyles(createStyles);
+  const { mode } = useTheme();
   const insets = useSafeAreaInsets();
   const {
     status,
@@ -66,7 +69,7 @@ export const LiveWalkingAnalyzerScreen: React.FC<LiveWalkingAnalyzerScreenProps>
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
       {/* Floating Header */}
       <View style={[styles.headerContainer, { top: insets.top + 8 }]}>
@@ -105,7 +108,7 @@ export const LiveWalkingAnalyzerScreen: React.FC<LiveWalkingAnalyzerScreenProps>
           permissionState.backgroundLocation !== 'granted') && (
           <View style={[styles.bannerContainer, { top: insets.top + 64 }]}>
             <View style={styles.bannerIconBox}>
-              <ShieldAlert size={18} color="#EA580C" />
+              <ShieldAlert size={18} color="#FFD166" />
             </View>
             <View style={styles.bannerTextBox}>
               <Text style={styles.bannerTitle}>Screen-OFF Tracking Setup</Text>
@@ -158,7 +161,7 @@ export const LiveWalkingAnalyzerScreen: React.FC<LiveWalkingAnalyzerScreenProps>
             <View style={styles.summaryDragIndicator} />
 
             <View style={styles.summaryHeader}>
-              <CheckCircle size={32} color="#10B981" />
+              <CheckCircle size={32} color="#00D7C2" />
               <Text style={styles.summaryTitle}>Walk Completed!</Text>
               <Text style={styles.summarySubtitle}>
                 {lastSummary?.sessionTitle || 'Morning Walk'}
@@ -177,7 +180,7 @@ export const LiveWalkingAnalyzerScreen: React.FC<LiveWalkingAnalyzerScreenProps>
               {/* 4-Cell Analytics Matrix */}
               <View style={styles.summaryGrid}>
                 <View style={styles.summaryGridCell}>
-                  <Clock size={18} color="#64748B" />
+                  <Clock size={18} color="#91A7B2" />
                   <Text style={styles.summaryCellLabel}>Duration</Text>
                   <Text style={styles.summaryCellValue}>
                     {lastSummary ? Math.floor(lastSummary.activeDurationSeconds / 60) : 0}m{' '}
@@ -186,7 +189,7 @@ export const LiveWalkingAnalyzerScreen: React.FC<LiveWalkingAnalyzerScreenProps>
                 </View>
 
                 <View style={styles.summaryGridCell}>
-                  <TrendingUp size={18} color="#64748B" />
+                  <TrendingUp size={18} color="#91A7B2" />
                   <Text style={styles.summaryCellLabel}>Avg Pace</Text>
                   <Text style={styles.summaryCellValue}>
                     {lastSummary?.formattedAvgPace || '--:-- /km'}
@@ -194,7 +197,7 @@ export const LiveWalkingAnalyzerScreen: React.FC<LiveWalkingAnalyzerScreenProps>
                 </View>
 
                 <View style={styles.summaryGridCell}>
-                  <Flame size={18} color="#EA580C" />
+                  <Flame size={18} color="#FFD166" />
                   <Text style={styles.summaryCellLabel}>Calories</Text>
                   <Text style={styles.summaryCellValue}>
                     {lastSummary?.estimatedCaloriesBurned || 0} kcal
@@ -234,10 +237,10 @@ export const LiveWalkingAnalyzerScreen: React.FC<LiveWalkingAnalyzerScreenProps>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#0D1824',
   },
   headerContainer: {
     position: 'absolute',
@@ -276,7 +279,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#F4F8FA',
   },
   headerSubtitle: {
     fontSize: 10,
@@ -302,9 +305,9 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     zIndex: 25,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#392B18',
     borderWidth: 1,
-    borderColor: '#FFEDD5',
+    borderColor: '#392B18',
     borderRadius: 14,
     padding: 12,
     flexDirection: 'row',
@@ -325,16 +328,16 @@ const styles = StyleSheet.create({
   bannerTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#9A3412',
+    color: '#FFD166',
     marginBottom: 2,
   },
   bannerBody: {
     fontSize: 11,
-    color: '#C2410C',
+    color: '#FFD166',
     lineHeight: 14,
   },
   bannerActionButton: {
-    backgroundColor: '#EA580C',
+    backgroundColor: '#FFD166',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -352,14 +355,14 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     zIndex: 35,
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FECACA',
+    backgroundColor: '#3B1C28',
+    borderColor: '#5A2731',
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
-  errorText: { color: '#991B1B', fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  errorText: { color: '#FF647C', fontSize: 12, lineHeight: 17, fontWeight: '700' },
   hudWrapper: {
     position: 'absolute',
     bottom: 0,
@@ -373,7 +376,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   summaryCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
@@ -383,7 +386,7 @@ const styles = StyleSheet.create({
   summaryDragIndicator: {
     width: 40,
     height: 4,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#203846',
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 16,
@@ -395,12 +398,12 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#F4F8FA',
     marginTop: 8,
   },
   summarySubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: '#91A7B2',
     marginTop: 2,
     fontWeight: '600',
   },
@@ -410,16 +413,16 @@ const styles = StyleSheet.create({
   summaryPrimaryMetric: {
     alignItems: 'center',
     paddingVertical: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#0D1824',
     borderRadius: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#203846',
   },
   summaryPrimaryValue: {
     fontSize: 48,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#F4F8FA',
     letterSpacing: -1,
   },
   summaryPrimaryUnit: {
@@ -438,28 +441,28 @@ const styles = StyleSheet.create({
   summaryGridCell: {
     flex: 1,
     minWidth: '47%',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#0D1824',
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#203846',
   },
   summaryCellLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#91A7B2',
     marginTop: 6,
   },
   summaryCellValue: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#F4F8FA',
     marginTop: 2,
   },
   fidelityCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#392B18',
     borderRadius: 12,
     padding: 12,
     gap: 10,
@@ -468,7 +471,7 @@ const styles = StyleSheet.create({
   fidelityText: {
     flex: 1,
     fontSize: 11,
-    color: '#9A3412',
+    color: '#FFD166',
     lineHeight: 15,
     fontWeight: '600',
   },

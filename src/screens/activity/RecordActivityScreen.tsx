@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useTheme, useThemeStyles } from '../../theme/ThemeContext';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
 import { SportType, GPSPoint, HeartRateSummary, KmSplit, ActivityPrivacy } from '../../types';
 import { ActivityService } from '../../services/activityService';
+import { HealthIntegrationService } from '../../services/healthIntegrationService';
 import { AuthService } from '../../services/auth';
 import GoogleActivityMap from '../../components/map/GoogleActivityMap';
 import GpsInfoPanel from '../../components/activity/GpsInfoPanel';
@@ -35,17 +37,23 @@ import {
   CheckCircle2,
   Share2,
   Award,
+  Bike,
+  Footprints,
+  Mountain,
+  PersonStanding,
+  type LucideIcon,
 } from 'lucide-react-native';
 
-const SPORT_OPTIONS: { id: SportType; label: string; icon: string }[] = [
-  { id: 'running', label: 'Run', icon: '🏃‍♂️' },
-  { id: 'cycling', label: 'Ride', icon: '🚴‍♂️' },
-  { id: 'walking', label: 'Walk', icon: '🚶‍♂️' },
-  { id: 'hiking', label: 'Hike', icon: '🥾' },
-  { id: 'weight_training', label: 'Gym', icon: '🏋️' },
+const SPORT_OPTIONS: { id: SportType; label: string; Icon: LucideIcon }[] = [
+  { id: 'running', label: 'Run', Icon: PersonStanding },
+  { id: 'cycling', label: 'Ride', Icon: Bike },
+  { id: 'walking', label: 'Walk', Icon: Footprints },
+  { id: 'hiking', label: 'Hike', Icon: Mountain },
 ];
 
 export default function RecordActivityScreen({ route, navigation }: any) {
+  const styles = useThemeStyles(createStyles);
+  const { mode } = useTheme();
   const insets = useSafeAreaInsets();
   const initialSport = route?.params?.initialSport || 'running';
   const [selectedSport, setSelectedSport] = useState<SportType>(initialSport);
@@ -79,13 +87,43 @@ export default function RecordActivityScreen({ route, navigation }: any) {
     resetTracking,
   } = useLocationTracker();
 
+  const trackerStatusRef = useRef(status);
+  useEffect(() => {
+    trackerStatusRef.current = status;
+  }, [status]);
+
+  // `navigate('RecordActivity')` can focus an existing stack screen instead
+  // of mounting a new one. Clear a finished session and get a fresh GPS fix
+  // whenever that stopped tracker screen is revisited.
+  useEffect(() => navigation.addListener('focus', () => {
+    if (trackerStatusRef.current !== 'stopped') return;
+    if (route?.params?.initialSport) setSelectedSport(route.params.initialSport);
+    resetTracking();
+    requestPermissions();
+  }), [navigation, requestPermissions, resetTracking, route?.params?.initialSport]);
+
   // Calories burned calculation (~62 kcal per km for running)
   // Do not estimate calories from elapsed time alone when the GPS route has no movement.
   const caloriesBurned = Math.round(totalDistanceKm * 62);
 
   // Start activity
   const handleStart = () => {
+    // A new session always starts with fresh counters and GPS history, even if
+    // React Navigation kept this screen mounted after the previous activity.
+    if (status === 'stopped') {
+      resetTracking();
+      requestPermissions().then((granted) => {
+        if (granted) startTracking();
+      });
+      return;
+    }
     startTracking();
+  };
+
+  const handleStartNewActivity = async () => {
+    resetTracking();
+    const granted = await requestPermissions();
+    if (!granted) return;
   };
 
   // Stop Activity Prompt
@@ -140,6 +178,8 @@ export default function RecordActivityScreen({ route, navigation }: any) {
       );
 
       const sportLabel = SPORT_OPTIONS.find((s) => s.id === selectedSport)?.label || 'Workout';
+      const activityStartTime = new Date(Date.now() - activeDurationSec * 1000).toISOString();
+      const activityEndTime = new Date().toISOString();
       let defaultTitle = `Outdoor ${sportLabel} - ${new Date().toLocaleDateString([], {
         month: 'short',
         day: 'numeric',
@@ -165,8 +205,8 @@ export default function RecordActivityScreen({ route, navigation }: any) {
         sportType: selectedSport,
         title: defaultTitle,
         notes: `Recorded with high-accuracy GPS tracking. Total ${pointsCount} coordinates collected.`,
-        startTime: new Date(Date.now() - activeDurationSec * 1000).toISOString(),
-        endTime: new Date().toISOString(),
+        startTime: activityStartTime,
+        endTime: activityEndTime,
         durationSeconds: activeDurationSec,
         activeDurationSeconds: activeDurationSec,
         distanceKm: totalDistanceKm,
@@ -176,6 +216,19 @@ export default function RecordActivityScreen({ route, navigation }: any) {
         splits: finalSplits,
         privacy: 'followers',
       });
+
+      // Share the workout with Apple Health / Health Connect only when the user
+      // has granted the native health permissions. A health sync failure must
+      // never prevent the AVFIT activity from being saved.
+      void HealthIntegrationService.writeWorkout({
+        activityId: activity?.id,
+        sportType: selectedSport,
+        title: defaultTitle,
+        startTime: activityStartTime,
+        endTime: activityEndTime,
+        distanceKm: totalDistanceKm,
+        caloriesBurned,
+      }).catch(() => undefined);
 
       setIsSaving(false);
 
@@ -223,7 +276,7 @@ export default function RecordActivityScreen({ route, navigation }: any) {
 
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={Colors.background} />
 
       {/* Top Navigation Header */}
       <View style={styles.header}>
@@ -251,24 +304,22 @@ export default function RecordActivityScreen({ route, navigation }: any) {
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Google Maps Tracker</Text>
+        <Text style={styles.headerTitle}>GPS Activity Tracker</Text>
 
-        {/* GPS Live Status Indicator */}
-        <View style={styles.gpsStatusIndicator}>
+        {/* Show GPS state only after the user starts; avoid a redundant READY card. */}
+        {isTracking && <View style={styles.gpsStatusIndicator}>
           <View
             style={[
               styles.gpsDot,
               isRecording
                 ? styles.gpsDotActive
-                : status === 'ready'
-                ? styles.gpsDotReady
                 : styles.gpsDotAmber,
             ]}
           />
           <Text style={styles.gpsIndicatorText}>
-            {isRecording ? 'LIVE GPS' : status === 'ready' ? 'READY' : 'LOCATING'}
+            {isRecording ? 'LIVE GPS' : 'PAUSED'}
           </Text>
-        </View>
+        </View>}
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -288,13 +339,14 @@ export default function RecordActivityScreen({ route, navigation }: any) {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sportScroll}>
             {SPORT_OPTIONS.map((sport) => {
               const active = selectedSport === sport.id;
+              const SportIcon = sport.Icon;
               return (
                 <TouchableOpacity
                   key={sport.id}
                   style={[styles.sportPill, active && styles.sportPillActive]}
                   onPress={() => setSelectedSport(sport.id)}
                 >
-                  <Text style={styles.sportIcon}>{sport.icon}</Text>
+                  <SportIcon size={17} color={active ? Colors.textLight : Colors.textSecondary} />
                   <Text style={[styles.sportLabel, active && styles.sportLabelActive]}>
                     {sport.label}
                   </Text>
@@ -304,7 +356,8 @@ export default function RecordActivityScreen({ route, navigation }: any) {
           </ScrollView>
         )}
 
-        {/* INTERACTIVE GOOGLE MAP (MAIN FOCUS OF THE SCREEN) */}
+        {/* Google Maps uses the configured Android API key. GPS recording stays
+            alive if Maps cannot load because GoogleActivityMap falls back to OSM. */}
         <View style={styles.mapHeroCard}>
           <GoogleActivityMap
             currentLocation={currentLocation}
@@ -316,14 +369,14 @@ export default function RecordActivityScreen({ route, navigation }: any) {
         </View>
 
         {/* LIVE GPS INFORMATION PANEL */}
-        <GpsInfoPanel
+        {isTracking && <GpsInfoPanel
           latitude={currentLocation?.latitude ?? null}
           longitude={currentLocation?.longitude ?? null}
           accuracy={gpsAccuracy}
           lastUpdateTime={lastUpdateTime}
           status={status}
           isTracking={isTracking}
-        />
+        />}
 
         {/* WORKOUT METRICS SUMMARY / HUD */}
         <View style={styles.metricsCard}>
@@ -391,7 +444,7 @@ export default function RecordActivityScreen({ route, navigation }: any) {
                 onPress={handleDiscardPrompt}
                 disabled={isSaving}
               >
-                <Trash2 size={16} color="#DC2626" />
+                <Trash2 size={16} color="#FF647C" />
                 <Text style={styles.discardBtnText}>Discard Activity</Text>
               </TouchableOpacity>
 
@@ -410,6 +463,15 @@ export default function RecordActivityScreen({ route, navigation }: any) {
                 )}
               </TouchableOpacity>
             </View>
+            <TouchableOpacity
+              style={styles.newActivityBtn}
+              onPress={handleStartNewActivity}
+              disabled={isSaving}
+              activeOpacity={0.85}
+            >
+              <RotateCcw size={16} color={Colors.primary} />
+              <Text style={styles.newActivityBtnText}>New Activity</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -471,7 +533,7 @@ export default function RecordActivityScreen({ route, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -504,7 +566,7 @@ const styles = StyleSheet.create({
   gpsStatusIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
     paddingHorizontal: 10,
@@ -521,7 +583,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentOrange,
   },
   gpsDotReady: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#00D7C2',
   },
   gpsDotAmber: {
     backgroundColor: '#F59E0B',
@@ -537,20 +599,20 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   errorBanner: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#3A3316',
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: '#6B5524',
   },
   errorBannerText: {
     flex: 1,
     fontSize: 12,
     fontWeight: '600',
-    color: '#92400E',
+    color: '#FFD166',
     marginLeft: 8,
     lineHeight: 16,
   },
@@ -572,7 +634,7 @@ const styles = StyleSheet.create({
   sportPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -609,7 +671,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   metricsCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 24,
     padding: 20,
     borderWidth: 1,
@@ -683,7 +745,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.borderSubtle,
   },
   stoppedSummaryCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
@@ -711,18 +773,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  newActivityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 46,
+    marginTop: 10,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceWarm,
+  },
+  newActivityBtnText: {
+    color: Colors.primary,
+    fontSize: 14,
+    fontWeight: '800',
+  },
   discardBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#3B1C28',
     height: 48,
     borderRadius: 16,
     gap: 6,
   },
   discardBtnText: {
-    color: '#DC2626',
+    color: '#FF647C',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -746,7 +825,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderTopWidth: 1,
     borderTopColor: Colors.borderSubtle,
     paddingHorizontal: 18,

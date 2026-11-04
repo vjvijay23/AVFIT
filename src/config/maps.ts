@@ -10,6 +10,6 @@ export const MAP_CONFIG = {
   defaultLongitude: -122.4194,
   defaultZoom: 17,
   defaultDelta: 0.005,
-  polylineColor: '#FC5200', // Strava Athletic Orange
+  polylineColor: '#2DF461', // Strava Athletic Orange
   polylineWidth: 5,
 };

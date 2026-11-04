@@ -1,3 +1,4 @@
+import { useTheme, useThemeStyles } from '../../theme/ThemeContext';
 import React from 'react';
 import { View, StyleSheet, Text, Image } from 'react-native';
 
@@ -14,10 +15,12 @@ export default function AvfitLogo({
   wordmarkColor,
   variant = 'brand',
 }: LogoProps) {
-  // Brand color scheme: Deep Forest Green (#244A32) & Terracotta Orange (#EB7142)
-  const defaultAVColor = variant === 'light' ? '#FFFFFF' : '#244A32';
+  const styles = useThemeStyles(createStyles);
+  const { mode } = useTheme();
+  // Brand color scheme: midnight navy with electric teal and lime.
+  const defaultAVColor = variant === 'light' ? '#FFFFFF' : (variant === 'brand' && mode === 'light' ? '#007968' : '#00D7C2');
   const avColor = wordmarkColor || defaultAVColor;
-  const fitColor = '#EB7142';
+  const fitColor = variant === 'brand' && mode === 'light' ? '#00813A' : '#2DF461';
 
   // Proportional font sizing matching emblem
   const fontSize = Math.round(size * 0.54);
@@ -32,11 +35,14 @@ export default function AvfitLogo({
             width: size,
             height: size,
             borderRadius: Math.round(size * 0.24),
+            backgroundColor: '#050B16',
+            borderWidth: mode === 'light' ? 1 : 0,
+            borderColor: mode === 'light' ? '#C9D9DE' : 'transparent',
           },
         ]}
       >
         <Image
-          source={require('../../../assets/avfit_official_logo.png')}
+          source={require('../../../assets/avfit-mountain-mark.png')}
           style={{
             width: '100%',
             height: '100%',
@@ -55,7 +61,7 @@ export default function AvfitLogo({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -63,7 +69,7 @@ const styles = StyleSheet.create({
   },
   emblemContainer: {
     overflow: 'hidden',
-    backgroundColor: '#0F1115',
+    backgroundColor: '#050B16',
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,

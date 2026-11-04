@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from 'lucide-react-native';
@@ -14,6 +15,7 @@ const palette = {
 };
 
 export default function AppNoticeCard({ message, tone = 'info', title, compact = false }: Props) {
+  const styles = useThemeStyles(createStyles);
   const colors = palette[tone];
   const Icon = tone === 'success' ? CheckCircle2 : tone === 'warning' ? TriangleAlert : tone === 'error' ? AlertCircle : Info;
   return (
@@ -27,7 +29,7 @@ export default function AppNoticeCard({ message, tone = 'info', title, compact =
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   card: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, padding: 15, borderWidth: 1, borderRadius: 17, marginBottom: 14 },
   compact: { padding: 12, borderRadius: 14, marginBottom: 12 },
   icon: { marginTop: 1 },

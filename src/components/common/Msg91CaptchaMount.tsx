@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useEffect } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -6,6 +7,7 @@ import * as Msg91Otp from '../../services/msg91Otp';
 export const MSG91_CAPTCHA_ELEMENT_ID = 'avfit-msg91-captcha';
 
 export default function Msg91CaptchaMount() {
+  const styles = useThemeStyles(createStyles);
   const isFocused = useIsFocused();
 
   useEffect(() => {
@@ -19,7 +21,7 @@ export default function Msg91CaptchaMount() {
   return <View nativeID={MSG91_CAPTCHA_ELEMENT_ID} style={styles.mount} accessibilityLabel="SMS CAPTCHA verification" />;
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   mount: {
     minHeight: 78,
     marginTop: 8,

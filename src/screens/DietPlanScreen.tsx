@@ -1,19 +1,24 @@
+import { useTheme, useThemeStyles } from '../theme/ThemeContext';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, CheckCircle2, Flame, Sparkles, Utensils } from 'lucide-react-native';
+import { ArrowLeft, Camera, CheckCircle2, ChevronRight, Flame, Sparkles, Utensils } from 'lucide-react-native';
 import { BackendApi } from '../services/backendApi';
 import { Colors } from '../theme/colors';
 import AppNoticeCard from '../components/common/AppNoticeCard';
 
-type Meal = { name: string; portion: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; fiber_g: number };
+type Meal = { meal_type?: 'breakfast' | 'lunch' | 'snack' | 'dinner'; name: string; portion: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; fiber_g: number };
 type DietDay = { day: string; meals: Meal[]; daily_totals: Record<string, number> };
 type DietPlan = { title: string; goal_summary: string; daily_targets: Record<string, number>; days: DietDay[]; notes: string[] };
 
-export default function DietPlanScreen({ navigation }: any) {
+export default function DietPlanScreen({ navigation, route }: any) {
+  const styles = useThemeStyles(createStyles);
+  const { mode } = useTheme();
   const insets = useSafeAreaInsets();
   const [focus, setFocus] = useState('');
   const [plan, setPlan] = useState<DietPlan | null>(null);
+  const [todayMeals, setTodayMeals] = useState<Array<Record<string, any>>>([]);
+  const [calorieTarget, setCalorieTarget] = useState(0);
   const [dayIndex, setDayIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -23,11 +28,32 @@ export default function DietPlanScreen({ navigation }: any) {
 
   useEffect(() => {
     if (!BackendApi.hasAuthToken()) { setLoading(false); return; }
-    BackendApi.getLatestDietPlan()
-      .then((response) => { setPlan(response.plan?.plan || null); setDayIndex(0); })
-      .catch(() => setNotice('Your saved chart could not be loaded. Check your connection and try again.'))
-      .finally(() => setLoading(false));
-  }, []);
+    const load = async () => {
+      const [planResult, mealsResult, profileResult] = await Promise.allSettled([
+        BackendApi.getLatestDietPlan(),
+        BackendApi.getMeals(),
+        BackendApi.getFitnessProfile(),
+      ]);
+      if (planResult.status === 'fulfilled') {
+        const savedPlan = planResult.value.plan?.plan || null;
+        setPlan(savedPlan);
+        setDayIndex(0);
+        if (savedPlan?.daily_targets?.calories) setCalorieTarget(Number(savedPlan.daily_targets.calories));
+      } else setNotice('Your saved chart could not be loaded. Check your connection and try again.');
+      if (mealsResult.status === 'fulfilled') {
+        const today = localDateKey(new Date());
+        setTodayMeals(mealsResult.value.meals.filter((meal) => meal.logged_at && localDateKey(new Date(meal.logged_at)) === today));
+      }
+      if (profileResult.status === 'fulfilled') {
+        const target = Number(profileResult.value.profile?.daily_calorie_target || profileResult.value.profile?.dailyCalorieTarget || 0);
+        if (target > 0) setCalorieTarget(target);
+      }
+    };
+    void load().finally(() => setLoading(false));
+    // Refresh the diary when returning from the scanner so saved meals appear immediately.
+    const unsubscribe = navigation?.addListener?.('focus', () => { void load(); });
+    return unsubscribe;
+  }, [navigation]);
 
   const generate = async () => {
     if (!BackendApi.hasAuthToken()) { setNotice('Sign in first so your personalized chart can use your body details and save to your account.'); return; }
@@ -35,6 +61,7 @@ export default function DietPlanScreen({ navigation }: any) {
     try {
       const response = await BackendApi.generateDietPlan(focus.trim() || undefined);
       setPlan(response.plan.plan); setDayIndex(0);
+      setCalorieTarget(Number(response.plan.plan?.daily_targets?.calories || calorieTarget));
     } catch (error: any) {
       setNotice(error?.message || 'We could not prepare your chart right now. Please try again.');
     } finally { setGenerating(false); }
@@ -42,16 +69,16 @@ export default function DietPlanScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={Colors.background} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityLabel="Go back"><ArrowLeft color={Colors.textPrimary} size={21} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => route?.name === 'Diet' ? navigation.navigate('Dashboard') : navigation.goBack()} style={styles.backButton} accessibilityLabel="Go back"><ArrowLeft color={Colors.textPrimary} size={21} /></TouchableOpacity>
         <View style={{ flex: 1 }}><Text style={styles.title}>Your Diet Chart</Text><Text style={styles.subtitle}>A practical, personalized 7-day meal guide</Text></View>
       </View>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 10, paddingBottom: 42 + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.generatorCard}>
           <View style={styles.generatorHeader}>
             <View style={styles.generatorIcon}><Sparkles size={21} color={Colors.primary} /></View>
-            <View style={{ flex: 1 }}><Text style={styles.generatorTitle}>Build your weekly plan</Text><Text style={styles.generatorSubtitle}>Uses your saved goals, body metrics and food preferences</Text></View>
+            <View style={{ flex: 1 }}><Text style={styles.generatorTitle}>Build your weekly plan</Text><Text style={styles.generatorSubtitle}>Uses your saved weight, fitness goals, recent activities and food preferences</Text></View>
             <View style={styles.weekBadge}><Text style={styles.weekBadgeText}>7 DAYS</Text></View>
           </View>
           {signedIn ? <>
@@ -80,6 +107,27 @@ export default function DietPlanScreen({ navigation }: any) {
             </View>
           </View>
 
+          <View style={styles.todayCaloriesCard}>
+            <View style={styles.todayCaloriesHeader}>
+              <View style={{ flex: 1 }}><Text style={styles.todayCaloriesTitle}>Today&apos;s calorie progress</Text><Text style={styles.todayCaloriesSubtitle}>Calories from your saved meal scans</Text></View>
+              <TouchableOpacity style={styles.logMealButton} onPress={() => navigation.navigate('FoodScanner')} accessibilityRole="button">
+                <Camera size={15} color={Colors.primary} /><Text style={styles.logMealText}>Log meal</Text><ChevronRight size={15} color={Colors.primary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.todayCaloriesValueRow}>
+              <Text style={styles.todayCaloriesValue}>{todayMeals.reduce((sum, meal) => sum + Number(meal.calories || 0), 0).toLocaleString()} <Text style={styles.todayCaloriesUnit}>/ {calorieTarget.toLocaleString()} kcal</Text></Text>
+              {calorieTarget > 0 && <Text style={styles.remainingCalories}>{Math.max(0, calorieTarget - todayMeals.reduce((sum, meal) => sum + Number(meal.calories || 0), 0)).toLocaleString()} left</Text>}
+            </View>
+            <View style={styles.todayCaloriesTrack}><View style={[styles.todayCaloriesFill, { width: `${calorieTarget > 0 ? Math.min(100, todayMeals.reduce((sum, meal) => sum + Number(meal.calories || 0), 0) / calorieTarget * 100) : 0}%` }]} /></View>
+            <View style={styles.mealSlotList}>
+              {(['breakfast', 'lunch', 'snack', 'dinner'] as const).map((type) => {
+                const calories = todayMeals.filter((meal) => String(meal.meal_type || '').toLowerCase() === type).reduce((sum, meal) => sum + Number(meal.calories || 0), 0);
+                const label = type === 'snack' ? 'Afternoon snack' : type[0].toUpperCase() + type.slice(1);
+                return <View key={type} style={styles.mealSlot}><View style={{ flex: 1 }}><Text style={styles.mealSlotLabel}>{label}</Text><Text style={styles.mealSlotHint}>{calories > 0 ? 'Logged today' : 'Not logged yet'}</Text></View><Text style={styles.mealSlotCalories}>{calories.toLocaleString()} kcal</Text></View>;
+              })}
+            </View>
+          </View>
+
           <Text style={styles.sectionTitle}>Your week</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.daySelector}>
             {plan.days.map((day, index) => <TouchableOpacity key={`${day.day}-${index}`} style={[styles.dayChip, dayIndex === index && styles.dayChipActive]} onPress={() => setDayIndex(index)}>
@@ -101,7 +149,7 @@ export default function DietPlanScreen({ navigation }: any) {
             </View>
             {selectedDay.meals.map((meal, index) => <View key={`${selectedDay.day}-${index}`} style={styles.mealRow}>
               <View style={styles.mealIndex}><Text style={styles.mealIndexText}>{index + 1}</Text></View>
-              <View style={{ flex: 1 }}><Text style={styles.mealName}>{meal.name}</Text><Text style={styles.mealPortion}>{meal.portion}</Text><Text style={styles.mealMacros}>P {meal.protein_g}g · C {meal.carbs_g}g · F {meal.fat_g}g · Fiber {meal.fiber_g}g</Text></View>
+              <View style={{ flex: 1 }}><Text style={styles.mealType}>{meal.meal_type === 'snack' ? 'Afternoon snack' : meal.meal_type || ['Breakfast', 'Lunch', 'Dinner'][index] || 'Meal'}</Text><Text style={styles.mealName}>{meal.name}</Text><Text style={styles.mealPortion}>{meal.portion}</Text><Text style={styles.mealMacros}>P {meal.protein_g}g · C {meal.carbs_g}g · F {meal.fat_g}g · Fiber {meal.fiber_g}g</Text></View>
               <Text style={styles.mealCalories}>{meal.calories} kcal</Text>
             </View>)}
           </View>}
@@ -115,57 +163,81 @@ export default function DietPlanScreen({ navigation }: any) {
 }
 
 function Target({ label, value, unit, color }: { label: string; value?: number; unit: string; color: string }) {
+  const styles = useThemeStyles(createStyles);
   return <View style={styles.target}><Text style={[styles.targetValue, { color }]}>{value ?? '—'}<Text style={styles.targetUnit}> {unit}</Text></Text><Text style={styles.targetLabel}>{label} / day</Text></View>;
 }
 function Macro({ label, value, color }: { label: string; value?: number; color: string }) {
+  const styles = useThemeStyles(createStyles);
   return <View style={styles.macroItem}><View style={[styles.macroDot, { backgroundColor: color }]} /><Text style={styles.macroValue}>{value ?? 0}g</Text><Text style={styles.macroLabel}>{label}</Text></View>;
 }
 
-const styles = StyleSheet.create({
+function localDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+const createStyles = () => ({
   container: { flex: 1, backgroundColor: Colors.background },
+  scrollContent: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 158 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingBottom: 10, gap: 13 },
-  backButton: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: Colors.borderSubtle },
+  backButton: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.borderSubtle },
   title: { color: Colors.textPrimary, fontSize: 24, fontWeight: '900' },
   subtitle: { color: Colors.textSecondary, fontSize: 14, marginTop: 3 },
-  generatorCard: { backgroundColor: '#fff', borderRadius: 23, padding: 18, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 14, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
-  generatorHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 18 },
+  generatorCard: { backgroundColor: Colors.surface, borderRadius: 23, padding: 18, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 18, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  generatorHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, marginBottom: 18 },
   generatorIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   generatorTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '900' },
   generatorSubtitle: { color: Colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 3 },
-  weekBadge: { backgroundColor: Colors.surfaceWarm, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 8 },
+  weekBadge: { backgroundColor: Colors.surfaceWarm, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 8, marginTop: 2 },
   weekBadgeText: { color: Colors.primary, fontSize: 11, fontWeight: '900' },
   label: { color: Colors.textPrimary, fontWeight: '800', fontSize: 13, marginBottom: 8 },
-  input: { minHeight: 54, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 14, paddingHorizontal: 14, color: Colors.textPrimary, fontSize: 15, backgroundColor: '#FAFAF8' },
+  input: { minHeight: 54, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 14, paddingHorizontal: 14, color: Colors.textPrimary, fontSize: 15, backgroundColor: Colors.backgroundLight },
   primaryButton: { minHeight: 56, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9, backgroundColor: Colors.primary, borderRadius: 16, marginTop: 13, paddingHorizontal: 16 },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
   buttonDisabled: { opacity: 0.7 },
-  loadingCard: { alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 20, padding: 24 },
+  loadingCard: { alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: Colors.surface, borderRadius: 20, padding: 24 },
   helpText: { color: Colors.textSecondary, fontSize: 15, lineHeight: 22 },
-  emptyCard: { alignItems: 'center', backgroundColor: '#fff', padding: 24, borderRadius: 22, borderWidth: 1, borderColor: Colors.borderSubtle, marginTop: 2 },
+  emptyCard: { alignItems: 'center', backgroundColor: Colors.surface, padding: 24, borderRadius: 22, borderWidth: 1, borderColor: Colors.borderSubtle, marginTop: 2 },
   emptyIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   emptyTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '900', textAlign: 'center', marginBottom: 7 },
-  planHero: { backgroundColor: '#EAF3ED', borderRadius: 24, padding: 19, marginTop: 2, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(36,74,50,0.15)' },
+  planHero: { backgroundColor: '#103B35', borderRadius: 24, padding: 18, marginTop: 2, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(36,74,50,0.15)' },
   planHeroTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  planSparkle: { width: 31, height: 31, borderRadius: 11, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  planSparkle: { width: 31, height: 31, borderRadius: 11, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
   planEyebrow: { flex: 1, color: Colors.primary, fontSize: 11, fontWeight: '900', letterSpacing: 0.7 },
-  savedPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: '#fff', borderRadius: 10 },
+  savedPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: Colors.surface, borderRadius: 10 },
   savedText: { color: Colors.primary, fontSize: 11, fontWeight: '800' },
   planTitle: { color: Colors.textPrimary, fontSize: 23, fontWeight: '900', marginTop: 14 },
   planSummary: { color: Colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: 5 },
-  targetsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 16 },
-  target: { width: '48%', minHeight: 76, justifyContent: 'center', backgroundColor: '#fff', borderRadius: 16, paddingHorizontal: 13, paddingVertical: 11 },
+  targetsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18 },
+  target: { width: '48%', minHeight: 78, justifyContent: 'center', backgroundColor: Colors.surface, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 },
   targetValue: { fontSize: 22, fontWeight: '900' },
   targetUnit: { color: Colors.textSecondary, fontSize: 13, fontWeight: '700' },
   targetLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600', marginTop: 2 },
   sectionTitle: { color: Colors.textPrimary, fontSize: 19, fontWeight: '900', marginBottom: 11 },
   daySelector: { gap: 9, paddingBottom: 14 },
-  dayChip: { minWidth: 103, paddingVertical: 11, paddingHorizontal: 13, borderRadius: 15, borderWidth: 1, borderColor: Colors.border, backgroundColor: '#fff' },
+  dayChip: { minWidth: 103, paddingVertical: 11, paddingHorizontal: 13, borderRadius: 15, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   dayChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   dayChipLabel: { color: Colors.textPrimary, fontSize: 14, fontWeight: '900' },
   dayChipLabelActive: { color: '#fff' },
   dayChipKcal: { color: Colors.textSecondary, fontSize: 12, fontWeight: '700', marginTop: 3 },
   dayChipKcalActive: { color: '#EAF3ED' },
-  dayCard: { backgroundColor: '#fff', borderRadius: 23, padding: 17, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 14 },
+  dayCard: { backgroundColor: Colors.surface, borderRadius: 23, padding: 17, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 14 },
+  todayCaloriesCard: { backgroundColor: Colors.surface, borderRadius: 21, padding: 17, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 20 },
+  todayCaloriesHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 15 },
+  todayCaloriesTitle: { color: Colors.textPrimary, fontSize: 17, fontWeight: '900' },
+  todayCaloriesSubtitle: { color: Colors.textSecondary, fontSize: 12, marginTop: 3 },
+  logMealButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, borderRadius: 11, backgroundColor: Colors.primarySoft },
+  logMealText: { color: Colors.primary, fontSize: 11, fontWeight: '900' },
+  todayCaloriesValueRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 9 },
+  todayCaloriesValue: { color: Colors.textPrimary, fontSize: 22, fontWeight: '900' },
+  todayCaloriesUnit: { color: Colors.textSecondary, fontSize: 13, fontWeight: '700' },
+  remainingCalories: { color: Colors.primary, fontSize: 12, fontWeight: '900' },
+  todayCaloriesTrack: { height: 10, borderRadius: 8, backgroundColor: Colors.backgroundLight, overflow: 'hidden' },
+  todayCaloriesFill: { height: '100%', borderRadius: 8, backgroundColor: Colors.accentOrange },
+  mealSlotList: { marginTop: 12 },
+  mealSlot: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth, borderColor: Colors.borderSubtle },
+  mealSlotLabel: { color: Colors.textPrimary, fontSize: 13, fontWeight: '800' },
+  mealSlotHint: { color: Colors.textMuted, fontSize: 11, marginTop: 2 },
+  mealSlotCalories: { color: Colors.primary, fontSize: 13, fontWeight: '900' },
   dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   dayEyebrow: { fontSize: 11, letterSpacing: 0.8, color: Colors.textMuted, fontWeight: '900' },
   dayTitle: { color: Colors.textPrimary, fontSize: 22, fontWeight: '900', marginTop: 2 },
@@ -180,10 +252,11 @@ const styles = StyleSheet.create({
   mealIndex: { width: 31, height: 31, borderRadius: 11, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   mealIndexText: { color: Colors.primary, fontSize: 13, fontWeight: '900' },
   mealName: { color: Colors.textPrimary, fontSize: 16, fontWeight: '800' },
+  mealType: { color: Colors.primary, fontSize: 11, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 3 },
   mealPortion: { color: Colors.textSecondary, fontSize: 13, marginTop: 3 },
   mealMacros: { color: Colors.textMuted, fontSize: 12, marginTop: 5 },
   mealCalories: { color: Colors.primary, fontSize: 13, fontWeight: '900' },
-  notesCard: { backgroundColor: '#fff', borderRadius: 21, padding: 17, borderWidth: 1, borderColor: Colors.borderSubtle, gap: 10 },
+  notesCard: { backgroundColor: Colors.surface, borderRadius: 21, padding: 17, borderWidth: 1, borderColor: Colors.borderSubtle, gap: 10 },
   noteRow: { flexDirection: 'row', gap: 9, alignItems: 'flex-start' },
   noteText: { flex: 1, color: Colors.textSecondary, fontSize: 14, lineHeight: 20 },
   disclaimer: { color: Colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 14, marginHorizontal: 3 },

@@ -1,0 +1,26 @@
+# Keep local-only credentials out of EAS build uploads; supply required
+# client configuration through the EAS build environment after account setup.
+.env*
+backend/.env*
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+# iOS-only build inputs and generated/local files
+backend/
+node_modules/
+.git/
+.codex-build/
+dist/
+web-build/
+android/.gradle/
+android/app/build/
+android/build/
+ios/build/
+ios/Pods/
+*.apk
+*.mp4
+*.log
+Thumbs.db
+.DS_Store

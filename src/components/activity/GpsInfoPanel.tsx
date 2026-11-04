@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../../theme/colors';
@@ -20,6 +21,7 @@ export default function GpsInfoPanel({
   status,
   isTracking,
 }: GpsInfoPanelProps) {
+  const styles = useThemeStyles(createStyles);
   const formatCoord = (coord: number | null, isLat: boolean) => {
     if (coord === null || coord === undefined || isNaN(coord)) {
       return '--.------';
@@ -35,9 +37,9 @@ export default function GpsInfoPanel({
       case 'paused':
         return { label: 'SESSION PAUSED', color: Colors.accentOrange, bg: Colors.accentSoft };
       case 'ready':
-        return { label: 'GPS READY', color: '#10B981', bg: '#E8F5E9' };
+        return { label: 'GPS READY', color: '#00D7C2', bg: '#103B35' };
       case 'initializing':
-        return { label: 'ACQUIRING GPS...', color: '#F59E0B', bg: '#FEF3C7' };
+        return { label: 'ACQUIRING GPS...', color: '#F59E0B', bg: '#3A3316' };
       case 'stopped':
         return { label: 'WORKOUT COMPLETED', color: Colors.primaryDark, bg: Colors.surfaceWarm };
       default:
@@ -109,9 +111,9 @@ export default function GpsInfoPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,

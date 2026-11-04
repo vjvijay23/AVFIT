@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "AVFIT",
+    "slug": "avfit",
+    "version": "1.1.33",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "android": {
+      "package": "com.avfit.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#050B16"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.avfit.app",
+      "supportsTablet": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bd76f5ce-77cd-47c2-8f57-ae10dbc307f9"
+      }
+    }
+  }
+}

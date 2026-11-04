@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useState, useMemo } from 'react';
 import {
   View,
@@ -56,6 +57,7 @@ export default function InbuiltRouteMap({
   overlayTitle = 'RACE GAP ANALYSIS',
   distanceKm = 0,
 }: InbuiltRouteMapProps) {
+  const styles = useThemeStyles(createStyles);
   const [mapTheme, setMapTheme] = useState<'street' | 'terrain' | 'dark'>('street');
   const [showAnalysisOverlay, setShowAnalysisOverlay] = useState(showOverlayChart);
 
@@ -118,38 +120,36 @@ export default function InbuiltRouteMap({
 
   // Milestone split markers along the route (e.g. 2k, 4k, 6k, 8k, 10k)
   const splitMarkers = useMemo(() => {
-    if (projectedPoints.length < 5) return [];
-    const count = 4;
-    const step = Math.floor(projectedPoints.length / (count + 1));
-    const markers = [];
-    for (let i = 1; i <= count; i++) {
-      const pt = projectedPoints[i * step];
+    if (projectedPoints.length < 2 || distanceKm < 1) return [];
+    const markers: Array<{ x: number; y: number; lat: number; lon: number; index: number; label: string }> = [];
+    const wholeKilometers = Math.floor(distanceKm);
+    for (let kilometer = 1; kilometer <= wholeKilometers; kilometer++) {
+      const pointIndex = Math.min(
+        projectedPoints.length - 1,
+        Math.round((kilometer / distanceKm) * (projectedPoints.length - 1)),
+      );
+      const pt = projectedPoints[pointIndex];
       if (pt) {
-        const kmLabel = `${Math.round((i * (distanceKm || 10)) / (count + 1))}k`;
-        markers.push({ ...pt, label: kmLabel });
+        markers.push({ ...pt, label: `${kilometer}k` });
       }
     }
     return markers;
   }, [projectedPoints, distanceKm]);
 
-  // OpenStreetMap / CartoDB tile calculations. Do not request a tile until we have a real fix.
+  // Use OpenStreetMap tiles in the fallback so this map needs no vendor API key.
   const tileUrl = useMemo(() => {
     if (projectedPoints.length === 0) return null;
-    const n = Math.pow(2, 13);
-    const x = Math.floor(((centerLon + 180) / 360) * n);
-    const latRad = (centerLat * Math.PI) / 180;
-    const y = Math.floor(
-      ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n
-    );
+    const n = Math.pow(2, zoomLevel);
+    const boundedLatitude = Math.max(-85.05112878, Math.min(85.05112878, centerLat));
+    const x = Math.max(0, Math.min(n - 1, Math.floor(((centerLon + 180) / 360) * n)));
+    const latRad = (boundedLatitude * Math.PI) / 180;
+    const y = Math.max(0, Math.min(
+      n - 1,
+      Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n),
+    ));
 
-    if (mapTheme === 'dark') {
-      return `https://a.basemaps.cartocdn.com/rastertiles/dark_all/13/${x}/${y}.png`;
-    } else if (mapTheme === 'terrain') {
-      return `https://tile.openstreetmap.org/13/${x}/${y}.png`;
-    }
-    // Clean Voyager light map (matching Strava style)
-    return `https://a.basemaps.cartocdn.com/rastertiles/voyager/13/${x}/${y}.png`;
-  }, [centerLat, centerLon, mapTheme, projectedPoints.length]);
+    return `https://tile.openstreetmap.org/${zoomLevel}/${x}/${y}.png`;
+  }, [centerLat, centerLon, zoomLevel, projectedPoints.length]);
 
   if (projectedPoints.length === 0) {
     return (
@@ -176,13 +176,13 @@ export default function InbuiltRouteMap({
         <Svg width={mapWidth} height={mapHeight} style={StyleSheet.absoluteFillObject}>
           <Defs>
             <LinearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="#EB7142" />
-              <Stop offset="70%" stopColor="#EB7142" />
-              <Stop offset="100%" stopColor="#244A32" />
+              <Stop offset="0%" stopColor="#2DF461" />
+              <Stop offset="70%" stopColor="#2DF461" />
+              <Stop offset="100%" stopColor="#00D7C2" />
             </LinearGradient>
             <LinearGradient id="glowFilter" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0%" stopColor="#EB7142" stopOpacity="0.4" />
-              <Stop offset="100%" stopColor="#244A32" stopOpacity="0.4" />
+              <Stop offset="0%" stopColor="#2DF461" stopOpacity="0.4" />
+              <Stop offset="100%" stopColor="#00D7C2" stopOpacity="0.4" />
             </LinearGradient>
           </Defs>
 
@@ -221,7 +221,7 @@ export default function InbuiltRouteMap({
           {/* Primary Athletic Route Line (Strava High-Visibility Orange) */}
           <Path
             d={pathString}
-            stroke="#EB7142"
+            stroke="#2DF461"
             strokeWidth={4.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -231,7 +231,7 @@ export default function InbuiltRouteMap({
           {/* Start Marker (Green Pin) */}
           {startPoint && (
             <G>
-              <Circle cx={startPoint.x} cy={startPoint.y} r={9} fill="#244A32" />
+              <Circle cx={startPoint.x} cy={startPoint.y} r={9} fill="#00D7C2" />
               <Circle cx={startPoint.x} cy={startPoint.y} r={5} fill="#FFFFFF" />
             </G>
           )}
@@ -239,13 +239,13 @@ export default function InbuiltRouteMap({
           {/* Split Kilometer Milestones along Route */}
           {splitMarkers.map((marker, idx) => (
             <G key={`split_${idx}`}>
-              <Circle cx={marker.x} cy={marker.y} r={8} fill="#FFFFFF" stroke="#0F172A" strokeWidth={1.5} />
+              <Circle cx={marker.x} cy={marker.y} r={8} fill="#FFFFFF" stroke="#F4F8FA" strokeWidth={1.5} />
               <SvgText
                 x={marker.x}
                 y={marker.y + 3}
                 fontSize={8}
                 fontWeight="bold"
-                fill="#0F172A"
+                fill="#F4F8FA"
                 textAnchor="middle"
               >
                 {marker.label}
@@ -256,8 +256,8 @@ export default function InbuiltRouteMap({
           {/* Finish Marker (Checkered / Bold Pin) */}
           {endPoint && (
             <G>
-              <Circle cx={endPoint.x} cy={endPoint.y} r={11} fill="#0F172A" stroke="#FFFFFF" strokeWidth={2} />
-              <Circle cx={endPoint.x} cy={endPoint.y} r={6} fill="#EB7142" />
+              <Circle cx={endPoint.x} cy={endPoint.y} r={11} fill="#F4F8FA" stroke="#FFFFFF" strokeWidth={2} />
+              <Circle cx={endPoint.x} cy={endPoint.y} r={6} fill="#2DF461" />
             </G>
           )}
 
@@ -289,7 +289,7 @@ export default function InbuiltRouteMap({
               setMapTheme(themes[nextIndex]);
             }}
           >
-            <Layers size={16} color="#0F172A" />
+            <Layers size={16} color="#F4F8FA" />
           </TouchableOpacity>
 
           {onToggleOverlay && (
@@ -300,7 +300,7 @@ export default function InbuiltRouteMap({
                 onToggleOverlay();
               }}
             >
-              <TrendingUp size={16} color={showAnalysisOverlay ? '#FFFFFF' : '#0F172A'} />
+              <TrendingUp size={16} color={showAnalysisOverlay ? '#FFFFFF' : '#050B16'} />
             </TouchableOpacity>
           )}
         </View>
@@ -325,9 +325,9 @@ export default function InbuiltRouteMap({
               strokeWidth={1}
             />
             {/* Y axis labels */}
-            <SvgText x={15} y={18} fontSize={9} fill="#94A3B8">0</SvgText>
-            <SvgText x={10} y={48} fontSize={9} fill="#94A3B8">-20</SvgText>
-            <SvgText x={10} y={78} fontSize={9} fill="#94A3B8">-40</SvgText>
+            <SvgText x={15} y={18} fontSize={9} fill="#91A7B2">0</SvgText>
+            <SvgText x={10} y={48} fontSize={9} fill="#91A7B2">-20</SvgText>
+            <SvgText x={10} y={78} fontSize={9} fill="#91A7B2">-40</SvgText>
 
             {/* Gap to Pedro (Purple Line) */}
             <Path
@@ -345,11 +345,11 @@ export default function InbuiltRouteMap({
             />
 
             {/* X axis labels */}
-            <SvgText x={30} y={96} fontSize={8} fill="#94A3B8">0</SvgText>
-            <SvgText x={100} y={96} fontSize={8} fill="#94A3B8">2k</SvgText>
-            <SvgText x={170} y={96} fontSize={8} fill="#94A3B8">4k</SvgText>
-            <SvgText x={240} y={96} fontSize={8} fill="#94A3B8">6k</SvgText>
-            <SvgText x={310} y={96} fontSize={8} fill="#94A3B8">10k</SvgText>
+            <SvgText x={30} y={96} fontSize={8} fill="#91A7B2">0</SvgText>
+            <SvgText x={100} y={96} fontSize={8} fill="#91A7B2">2k</SvgText>
+            <SvgText x={170} y={96} fontSize={8} fill="#91A7B2">4k</SvgText>
+            <SvgText x={240} y={96} fontSize={8} fill="#91A7B2">6k</SvgText>
+            <SvgText x={310} y={96} fontSize={8} fill="#91A7B2">10k</SvgText>
           </Svg>
 
           {/* Legend Badges */}
@@ -385,18 +385,18 @@ export default function InbuiltRouteMap({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   mapContainer: {
     width: '100%',
     borderRadius: 16,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: '#F3F0E6',
+    backgroundColor: '#08121D',
     borderWidth: 1,
-    borderColor: '#E6E1D5',
+    borderColor: '#203846',
   },
   waitingForGps: {
-    backgroundColor: '#F1F5F2',
+    backgroundColor: '#12202B',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
@@ -448,16 +448,16 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#10B981',
+    backgroundColor: '#00D7C2',
     marginRight: 6,
   },
   gpsDotLive: {
-    backgroundColor: '#EB7142',
+    backgroundColor: '#2DF461',
   },
   gpsText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#0F172A',
+    color: '#F4F8FA',
   },
   rightControls: {
     flexDirection: 'row',
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   iconButtonActive: {
-    backgroundColor: '#244A32',
+    backgroundColor: '#00D7C2',
   },
   raceGapCard: {
     position: 'absolute',
@@ -495,20 +495,20 @@ const styles = StyleSheet.create({
     elevation: 5,
     zIndex: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#203846',
   },
   raceGapHeader: {
     alignItems: 'center',
     marginBottom: 6,
   },
   raceGapTag: {
-    backgroundColor: '#FFEDD5',
+    backgroundColor: '#392B18',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 6,
   },
   raceGapTagText: {
-    color: '#EA580C',
+    color: '#FFD166',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -556,18 +556,18 @@ const styles = StyleSheet.create({
   statMiniLabel: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#91A7B2',
     letterSpacing: 0.4,
   },
   statMiniVal: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#F4F8FA',
     marginTop: 1,
   },
   statMiniDivider: {
     width: 1,
     height: 18,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#203846',
   },
 });

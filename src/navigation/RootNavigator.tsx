@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../theme/ThemeContext';
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,17 +7,16 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import {
   Home,
-  Footprints,
-  Camera,
-  Heart,
-  Users,
+  Activity,
+  Dumbbell,
+  ScanLine,
+  Utensils,
 } from 'lucide-react-native';
 
 // Tab Screens (Original Core Features)
 import DashboardScreen from '../screens/DashboardScreen';
 import ActivityTrackerScreen from '../screens/ActivityTrackerScreen';
 import FoodScannerScreen from '../screens/FoodScannerScreen';
-import WorkoutScreen from '../screens/WorkoutScreen';
 import CommunityScreen from '../screens/CommunityScreen';
 
 // Auth, Onboarding & Extra Feature Screens
@@ -33,23 +33,28 @@ import DietPlanScreen from '../screens/DietPlanScreen';
 import RecordActivityScreen from '../screens/activity/RecordActivityScreen';
 import ActivitySummaryScreen from '../screens/activity/ActivitySummaryScreen';
 import { LiveWalkingAnalyzerScreen } from '../modules/walking-analyzer';
+import GymWorkoutScreen from '../screens/activity/GymWorkoutScreen';
+import GymWorkoutDetailScreen from '../screens/activity/GymWorkoutDetailScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function MainTabs() {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: styles.tabBarLabel,
+        tabBarItemStyle: styles.tabBarItem,
         tabBarStyle: [
           styles.floatingPillTabBar,
           { bottom: Math.max(insets.bottom, 14) },
         ],
-        tabBarActiveTintColor: '#FFFFFF',
-        tabBarInactiveTintColor: '#6F7771',
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: Colors.textMuted,
       }}
     >
       <Tab.Screen
@@ -58,13 +63,14 @@ function MainTabs() {
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
-              <Home
-                size={focused ? 20 : 18}
-                color={focused ? Colors.primary : '#6F7771'}
-                fill={focused ? Colors.primary : 'transparent'}
+                <Home
+                size={focused ? 21 : 19}
+                color={focused ? Colors.primary : Colors.textMuted}
+                strokeWidth={focused ? 2.5 : 2}
               />
             </View>
           ),
+          tabBarLabel: 'Home',
         }}
       />
       <Tab.Screen
@@ -73,12 +79,31 @@ function MainTabs() {
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
-              <Footprints
-                size={focused ? 20 : 18}
-                color={focused ? Colors.primary : '#6F7771'}
+              <Activity
+                size={focused ? 21 : 19}
+                color={focused ? Colors.primary : Colors.textMuted}
+                strokeWidth={focused ? 2.5 : 2}
               />
             </View>
           ),
+          tabBarLabel: 'Move',
+        }}
+      />
+      <Tab.Screen
+        name="Gym"
+        component={ActivityTrackerScreen}
+        initialParams={{ initialSport: 'weight_training', gymOnly: true }}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
+              <Dumbbell
+                size={focused ? 21 : 19}
+                color={focused ? Colors.primary : Colors.textMuted}
+                strokeWidth={focused ? 2.5 : 2}
+              />
+            </View>
+          ),
+          tabBarLabel: 'Train',
         }}
       />
       <Tab.Screen
@@ -87,41 +112,30 @@ function MainTabs() {
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
-              <Camera
-                size={focused ? 20 : 18}
-                color={focused ? Colors.primary : '#6F7771'}
+              <ScanLine
+                size={focused ? 21 : 19}
+                color={focused ? Colors.primary : Colors.textMuted}
+                strokeWidth={focused ? 2.5 : 2}
               />
             </View>
           ),
+          tabBarLabel: 'Scan',
         }}
       />
       <Tab.Screen
-        name="Workouts"
-        component={WorkoutScreen}
+        name="Diet"
+        component={DietPlanScreen}
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
-              <Heart
-                size={focused ? 20 : 18}
-                color={focused ? Colors.primary : '#6F7771'}
-                fill={focused ? Colors.primary : 'transparent'}
+              <Utensils
+                size={focused ? 21 : 19}
+                color={focused ? Colors.primary : Colors.textMuted}
+                strokeWidth={focused ? 2.5 : 2}
               />
             </View>
           ),
-        }}
-      />
-      <Tab.Screen
-        name="Community"
-        component={CommunityScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
-              <Users
-                size={focused ? 20 : 18}
-                color={focused ? Colors.primary : '#6F7771'}
-              />
-            </View>
-          ),
+          tabBarLabel: 'Nutrition',
         }}
       />
     </Tab.Navigator>
@@ -158,6 +172,9 @@ export default function RootNavigator({ initialRouteName = 'AuthWelcome' }: { in
       <Stack.Screen name="RecordActivity" component={RecordActivityScreen} />
       <Stack.Screen name="Record" component={RecordActivityScreen} />
       <Stack.Screen name="ActivitySummary" component={ActivitySummaryScreen} />
+      <Stack.Screen name="GymWorkout" component={GymWorkoutScreen} />
+      <Stack.Screen name="GymWorkoutDetail" component={GymWorkoutDetailScreen} />
+      <Stack.Screen name="Community" component={CommunityScreen} />
 
       {/* Strava-grade Live Walking Analyzer (Screen-off Foreground Service) */}
       <Stack.Screen name="LiveWalkingAnalyzer" component={LiveWalkingAnalyzerScreen} />
@@ -176,37 +193,41 @@ export default function RootNavigator({ initialRouteName = 'AuthWelcome' }: { in
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   floatingPillTabBar: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 24 : 16,
     left: 20,
     right: 20,
-    backgroundColor: '#161A17', // Dark Charcoal Dock matching original AVFIT design
-    borderRadius: 36,
-    height: 64,
+    backgroundColor: Colors.navbarBackground,
+    borderRadius: 25,
+    height: 76,
     borderTopWidth: 0,
     elevation: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: 5,
+    paddingTop: 6,
+    paddingBottom: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 37,
+    height: 32,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   activeTabBadge: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.navbarActiveBadge,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
   },
+  tabBarItem: { paddingTop: 3 },
+  tabBarLabel: { fontSize: 9, fontWeight: '800', marginTop: 2, marginBottom: 2 },
 });

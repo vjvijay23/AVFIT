@@ -1,3 +1,4 @@
+import { useThemeStyles } from '../../theme/ThemeContext';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -45,6 +46,7 @@ export default function OtpVerificationScreen({
   onVerifiedSuccess,
   onBackToPhone,
 }: OtpVerificationScreenProps) {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   const phone = route?.params?.phone || '';
   const countryCode = route?.params?.countryCode || '+1';
@@ -289,7 +291,7 @@ export default function OtpVerificationScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => ({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -304,7 +306,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     borderRadius: 26,
     padding: 24,
     borderWidth: 1,
@@ -385,7 +387,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#3B1C28',
     padding: 10,
     borderRadius: 12,
     marginBottom: 16,
@@ -410,7 +412,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    backgroundColor: '#FAFAF8',
+    backgroundColor: '#0B1621',
     textAlign: 'center',
     fontSize: 22,
     fontWeight: '800',
@@ -418,7 +420,7 @@ const styles = StyleSheet.create({
   },
   otpCellFilled: {
     borderColor: Colors.primary,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0D1824',
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -426,7 +428,7 @@ const styles = StyleSheet.create({
   },
   otpCellError: {
     borderColor: Colors.danger,
-    backgroundColor: '#FFF5F5',
+    backgroundColor: '#3B1C28',
   },
   resendContainer: {
     marginBottom: 24,
