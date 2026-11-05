@@ -20,6 +20,7 @@ import {
   Footprints,
   Dumbbell,
   Users,
+  ArrowUpRight,
   type LucideIcon,
 } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
@@ -213,6 +214,46 @@ export default function DashboardScreen({ navigation }: any) {
           calorieTarget={calorieTarget}
           proteinTarget={proteinTarget}
         />
+
+        {/* Reference-inspired training discovery: concise, tappable session cards and focus areas. */}
+        <View style={styles.discoverSection}>
+          <View style={styles.discoverHeader}>
+            <View>
+              <Text style={styles.discoverEyebrow}>MOVE WITH PURPOSE</Text>
+              <Text style={styles.discoverTitle}>Choose your focus</Text>
+            </View>
+            <TouchableOpacity style={styles.discoverAll} onPress={() => navigation?.navigate?.('Gym')} accessibilityRole="button" accessibilityLabel="Open training">
+              <ArrowUpRight size={18} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.focusCarousel}>
+            <TouchableOpacity style={[styles.focusCard, styles.focusStrength]} onPress={() => navigation?.navigate?.('Gym')} activeOpacity={0.84}>
+              <View style={styles.focusCardTop}><View style={styles.focusIcon}><Dumbbell size={19} color={Colors.primary} /></View><Text style={styles.focusArrow}>↗</Text></View>
+              <Text style={styles.focusTitle}>Strength</Text>
+              <Text style={styles.focusCaption}>Build power</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.focusCard, styles.focusRun]} onPress={() => navigation?.navigate?.('Activity', { initialSport: 'running' })} activeOpacity={0.84}>
+              <View style={styles.focusCardTop}><View style={styles.focusIcon}><PersonStanding size={20} color={Colors.primary} /></View><Text style={styles.focusArrow}>↗</Text></View>
+              <Text style={styles.focusTitle}>Run</Text>
+              <Text style={styles.focusCaption}>Find your pace</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.focusCard, styles.focusWalk]} onPress={() => navigation?.navigate?.('Activity', { initialSport: 'walking' })} activeOpacity={0.84}>
+              <View style={styles.focusCardTop}><View style={styles.focusIcon}><Footprints size={19} color={Colors.primary} /></View><Text style={styles.focusArrow}>↗</Text></View>
+              <Text style={styles.focusTitle}>Walk</Text>
+              <Text style={styles.focusCaption}>Easy movement</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          <Text style={styles.focusAreasLabel}>BODY FOCUS</Text>
+          <View style={styles.bodyFocusRow}>
+            {['Chest', 'Back', 'Legs', 'Core'].map((area) => (
+              <TouchableOpacity key={area} style={styles.bodyFocusPill} onPress={() => navigation?.navigate?.('Gym')} activeOpacity={0.8}>
+                <Text style={styles.bodyFocusText}>{area}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         {/* Simple shortcuts keep the main tools easy to reach without a long goals list. */}
         <View style={styles.quickActionsRow}>
@@ -436,6 +477,25 @@ const createStyles = () => ({
   trainingRoadmapMilestone: { color: Colors.textSecondary, fontSize: 11, lineHeight: 17 },
   trainingStartButton: { minHeight: 43, borderRadius: 14, marginTop: 13, backgroundColor: Colors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
   trainingStartText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  discoverSection: { marginBottom: 18 },
+  discoverHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  discoverEyebrow: { color: Colors.primary, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  discoverTitle: { color: Colors.textPrimary, fontSize: 20, fontWeight: '900', letterSpacing: -0.35, marginTop: 3 },
+  discoverAll: { width: 38, height: 38, borderRadius: 14, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.borderSubtle, alignItems: 'center', justifyContent: 'center' },
+  focusCarousel: { gap: 10, paddingRight: 2 },
+  focusCard: { width: 145, minHeight: 132, borderRadius: 21, padding: 14, borderWidth: 1, borderColor: Colors.borderSubtle, justifyContent: 'space-between' },
+  focusStrength: { backgroundColor: Colors.surface },
+  focusRun: { backgroundColor: Colors.surfaceWarm },
+  focusWalk: { backgroundColor: Colors.primarySoft },
+  focusCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  focusIcon: { width: 38, height: 38, borderRadius: 14, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center' },
+  focusArrow: { color: Colors.primary, fontSize: 18, fontWeight: '900' },
+  focusTitle: { color: Colors.textPrimary, fontSize: 17, fontWeight: '900', marginTop: 12 },
+  focusCaption: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  focusAreasLabel: { color: Colors.textMuted, fontSize: 9, fontWeight: '900', letterSpacing: 1, marginTop: 14, marginBottom: 8 },
+  bodyFocusRow: { flexDirection: 'row', gap: 8 },
+  bodyFocusPill: { flex: 1, minHeight: 36, paddingHorizontal: 10, borderRadius: 13, borderWidth: 1, borderColor: Colors.borderSubtle, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  bodyFocusText: { color: Colors.textPrimary, fontSize: 11, fontWeight: '800' },
   nutritionEngineCard: {
     backgroundColor: Colors.surface,
     borderRadius: 21,
