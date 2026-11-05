@@ -7,8 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Linking,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
@@ -22,8 +20,6 @@ import {
   Footprints,
   Dumbbell,
   Users,
-  RefreshCw,
-  ExternalLink,
   type LucideIcon,
 } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
@@ -51,19 +47,14 @@ export default function DashboardScreen({ navigation }: any) {
   const [trainingRecommendation, setTrainingRecommendation] = useState<Record<string, any> | null>(null);
   const [trainingLoading, setTrainingLoading] = useState(false);
   const [trainingError, setTrainingError] = useState('');
-  const [stravaStatus, setStravaStatus] = useState<{ configured: boolean; connected: boolean; connection: Record<string, any> | null } | null>(null);
-  const [stravaActivities, setStravaActivities] = useState<Array<Record<string, any>>>([]);
-  const [stravaSyncing, setStravaSyncing] = useState(false);
-
   const fetchData = async () => {
-    const [userResult, fitnessResult, statsResult, activitiesResult, connectedResult, trainingResult, stravaResult] = await Promise.allSettled([
+    const [userResult, fitnessResult, statsResult, activitiesResult, connectedResult, trainingResult] = await Promise.allSettled([
       AuthService.getUserProfile(),
       FitnessProfileService.getFitnessProfile(),
       ActivityService.getUserStats(),
       ActivityService.getUserActivities(),
       HealthIntegrationService.isConnected(),
       BackendApi.getTrainingRecommendation(),
-      BackendApi.getStravaStatus(),
     ]);
 
     if (userResult.status === 'fulfilled') setUserProfile(userResult.value);
@@ -80,14 +71,6 @@ export default function DashboardScreen({ navigation }: any) {
         ? 'Update the AVFIT backend to enable your AI training plan.'
         : message || 'Training suggestions are temporarily unavailable.');
     }
-    if (stravaResult.status === 'fulfilled') {
-      setStravaStatus(stravaResult.value);
-      if (stravaResult.value.connected) {
-        const importedResult = await BackendApi.getStravaActivities().catch(() => null);
-        if (importedResult) setStravaActivities(importedResult.activities);
-      } else setStravaActivities([]);
-    }
-
     const connected = connectedResult.status === 'fulfilled' && connectedResult.value;
     setHealthConnected(connected);
     if (connected) {
@@ -125,9 +108,6 @@ export default function DashboardScreen({ navigation }: any) {
   const stepTarget = fitnessProfile?.dailyStepGoal || userStats?.todayStepGoal || 8000;
 
   const stepsToday = healthConnected ? (healthSummary?.steps || 0) : (userStats?.todaySteps || 0);
-  const distanceTodayKm = healthConnected
-    ? (healthSummary?.distanceMeters || 0) / 1000
-    : (userStats?.todayDistanceKm || 0);
   const activityCaloriesToday = healthConnected
     ? (healthSummary?.activeCalories || 0)
     : (userStats?.todayCalories || 0);
@@ -145,29 +125,6 @@ export default function DashboardScreen({ navigation }: any) {
     } catch (error: any) {
       setTrainingError(error?.message || 'Could not refresh your training suggestion.');
     } finally { setTrainingLoading(false); }
-  };
-
-  const connectStrava = async () => {
-    try {
-      const url = await BackendApi.startStravaConnection();
-      await Linking.openURL(url);
-    } catch (error: any) {
-      const message = String(error?.message || '');
-      Alert.alert('Could not connect Strava', /not found|404/i.test(message)
-        ? 'Update the AVFIT backend and configure the Strava app to enable account linking.'
-        : message || 'Could not start Strava connection.');
-    }
-  };
-
-  const syncStrava = async () => {
-    setStravaSyncing(true);
-    try {
-      const result = await BackendApi.syncStravaActivities();
-      setStravaActivities(result.activities || []);
-      Alert.alert('Strava synced', `${result.synced} recent activities are available in AVFIT.`);
-    } catch (error: any) {
-      Alert.alert('Could not sync Strava', error?.message || 'Try again shortly.');
-    } finally { setStravaSyncing(false); }
   };
 
   const startRecommendedPlan = () => {
@@ -226,25 +183,19 @@ export default function DashboardScreen({ navigation }: any) {
         {/* One simple, profile-based daily activity summary. */}
         <View style={styles.dailyProgressCard}>
           <View style={styles.dailyProgressHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.dailyProgressTitle}>Daily activity</Text>
-              <Text style={styles.dailyProgressSubtitle}>Your movement so far today</Text>
-            </View>
-            <Text style={styles.todayLabel}>TODAY</Text>
+            <Text style={styles.dailyProgressTitle}>Today&apos;s progress</Text>
           </View>
           <View style={styles.activitySummaryRow}>
-            <View style={styles.stepRing}>
-              <Svg width={110} height={110} viewBox="0 0 110 110">
-                <Circle cx={55} cy={55} r={45} stroke={Colors.backgroundLight} strokeWidth={9} fill="none" />
-                <Circle cx={55} cy={55} r={45} stroke={Colors.primary} strokeWidth={9} strokeLinecap="round" fill="none" strokeDasharray={`${2 * Math.PI * 45} ${2 * Math.PI * 45}`} strokeDashoffset={2 * Math.PI * 45 * (1 - Math.min(1, stepsToday / Math.max(1, stepTarget)))} rotation={-90} origin="55, 55" />
-              </Svg>
-              <View style={styles.stepRingCenter}><Text style={styles.stepRingValue}>{Math.min(100, Math.round((stepsToday / Math.max(1, stepTarget)) * 100))}%</Text><Text style={styles.stepRingLabel}>STEP GOAL</Text></View>
-            </View>
             <View style={styles.activityMetricStack}>
-              <ActivityMetric icon={Footprints} label="Steps" value={stepsToday.toLocaleString()} detail={`of ${stepTarget.toLocaleString()}`} styles={styles} />
-              <ActivityMetric icon={PersonStanding} label="Distance" value={`${distanceTodayKm.toFixed(1)} km`} detail="today" styles={styles} />
-              <ActivityMetric icon={Flame} label="Calories" value={`${activityCaloriesToday} kcal`} detail={`${movementMinutesToday} active min`} styles={styles} />
+              <ActivityMetric icon={Footprints} label="Steps" value={stepsToday.toLocaleString()} color={Colors.primaryLight} progress={stepsToday / Math.max(1, stepTarget)} styles={styles} />
+              <ActivityMetric icon={PersonStanding} label="Active minutes" value={`${movementMinutesToday}`} suffix="mins" color={Colors.blue} progress={movementMinutesToday / 60} styles={styles} />
+              <ActivityMetric icon={Flame} label="Calories" value={activityCaloriesToday.toLocaleString()} suffix="kcal" color={Colors.lilac} progress={activityCaloriesToday / 500} styles={styles} />
             </View>
+            <ActivityHeartRings
+              stepProgress={stepsToday / Math.max(1, stepTarget)}
+              minuteProgress={movementMinutesToday / 60}
+              calorieProgress={activityCaloriesToday / 500}
+            />
           </View>
         </View>
 
@@ -262,25 +213,6 @@ export default function DashboardScreen({ navigation }: any) {
           calorieTarget={calorieTarget}
           proteinTarget={proteinTarget}
         />
-
-        <View style={styles.integrationsCard}>
-          <Text style={styles.integrationsHeading}>Connected apps</Text>
-          <View style={styles.stravaRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.stravaTitle}>Strava</Text>
-              <Text style={styles.stravaSubtitle}>{stravaStatus?.connected ? `Connected${stravaStatus.connection?.athlete_name ? ` · ${stravaStatus.connection.athlete_name}` : ''}` : 'Sync your Strava runs and workouts with AVFIT'}</Text>
-            </View>
-            {stravaStatus?.connected ? <TouchableOpacity style={styles.stravaButton} onPress={syncStrava} disabled={stravaSyncing}>
-              <RefreshCw size={14} color={Colors.primary} /><Text style={styles.stravaButtonText}>{stravaSyncing ? 'Syncing…' : 'Sync'}</Text>
-            </TouchableOpacity> : <TouchableOpacity style={styles.stravaButton} onPress={connectStrava}>
-              <ExternalLink size={14} color={Colors.primary} /><Text style={styles.stravaButtonText}>Connect</Text>
-            </TouchableOpacity>}
-          </View>
-          {stravaActivities.slice(0, 1).map((activity) => <View key={activity.strava_activity_id} style={styles.stravaActivity}>
-            <Text style={styles.stravaActivityName}>{activity.name}</Text>
-            <Text style={styles.stravaActivityMeta}>{activity.sport_type} · {(Number(activity.distance_m || 0) / 1000).toFixed(1)} km · {Math.round(Number(activity.moving_time_sec || 0) / 60)} min</Text>
-          </View>)}
-        </View>
 
         {/* Simple shortcuts keep the main tools easy to reach without a long goals list. */}
         <View style={styles.quickActionsRow}>
@@ -345,22 +277,45 @@ export default function DashboardScreen({ navigation }: any) {
   );
 }
 
-function ActivityMetric({ icon: Icon, label, value, detail, styles }: {
+function ActivityMetric({ icon: Icon, label, value, suffix, color, progress, styles }: {
   icon: LucideIcon;
   label: string;
   value: string;
-  detail: string;
+  suffix?: string;
+  color: string;
+  progress: number;
   styles: Record<string, any>;
 }) {
   return (
     <View style={styles.activityMetric}>
-      <View style={styles.activityMetricIcon}><Icon size={16} color={Colors.primary} strokeWidth={2.3} /></View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={styles.activityMetricHeading}><Text style={styles.activityMetricLabel}>{label}</Text><Text numberOfLines={1} style={styles.activityMetricDetail}>{detail}</Text></View>
-        <Text numberOfLines={1} adjustsFontSizeToFit style={styles.activityMetricValue}>{value}</Text>
+      <View style={[styles.activityMetricIcon, { backgroundColor: color }]}><Icon size={17} color="#FFFFFF" strokeWidth={2.4} /></View>
+      <View style={styles.activityMetricCopy}>
+        <Text style={styles.activityMetricLabel}>{label}</Text>
+        <Text numberOfLines={1} adjustsFontSizeToFit style={styles.activityMetricValue}>{value}<Text style={styles.activityMetricSuffix}>{suffix ? ` ${suffix}` : ''}</Text></Text>
+        <View style={styles.activityTrack}><View style={[styles.activityTrackFill, { width: `${Math.max(0, Math.min(progress, 1)) * 100}%`, backgroundColor: color }]} /></View>
       </View>
     </View>
   );
+}
+
+function ActivityHeartRings({ stepProgress, minuteProgress, calorieProgress }: { stepProgress: number; minuteProgress: number; calorieProgress: number }) {
+  const rings = [
+    { radius: 44, progress: stepProgress, color: Colors.primaryLight },
+    { radius: 33, progress: minuteProgress, color: Colors.blue },
+    { radius: 22, progress: calorieProgress, color: Colors.lilac },
+  ];
+  return <View style={{ width: 104, height: 104, alignItems: 'center', justifyContent: 'center' }}>
+    <Svg width={104} height={104} viewBox="0 0 100 100">
+      {rings.map((ring) => {
+        const circumference = 2 * Math.PI * ring.radius;
+        const progress = Math.max(0, Math.min(1, ring.progress));
+        return <React.Fragment key={ring.color}>
+          <Circle cx="50" cy="50" r={ring.radius} fill="none" stroke={ring.color} strokeOpacity={0.17} strokeWidth="7" />
+          <Circle cx="50" cy="50" r={ring.radius} fill="none" stroke={ring.color} strokeWidth="7" strokeLinecap="round" strokeDasharray={`${circumference * progress} ${circumference}`} rotation={-90} originX="50" originY="50" />
+        </React.Fragment>;
+      })}
+    </Svg>
+  </View>;
 }
 
 const createStyles = () => ({
@@ -383,33 +338,33 @@ const createStyles = () => ({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#0D1824',
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#203846',
+    borderColor: Colors.borderSubtle,
   },
   avatarEmoji: {
     fontSize: 20,
   },
   brandBadgePill: {
-    backgroundColor: '#0D1824',
+    backgroundColor: Colors.surface,
     paddingVertical: 5,
     paddingHorizontal: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#203846',
+    borderColor: Colors.borderSubtle,
     elevation: 1,
   },
   circleActionButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#0D1824',
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#203846',
+    borderColor: Colors.borderSubtle,
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -436,7 +391,7 @@ const createStyles = () => ({
   streakPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#10362F',
+    backgroundColor: Colors.primarySoft,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 16,
@@ -447,26 +402,20 @@ const createStyles = () => ({
     fontWeight: '800',
     color: Colors.accentOrange,
   },
-  dailyProgressCard: { backgroundColor: Colors.surface, borderRadius: 26, padding: 19, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 17, shadowColor: '#000000', shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.12, shadowRadius: 14, elevation: 3 },
-  dailyProgressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  dailyProgressTitle: { color: Colors.textPrimary, fontSize: 19, fontWeight: '900', letterSpacing: -0.2 },
-  dailyProgressSubtitle: { color: Colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 3 },
-  todayLabel: { color: Colors.primary, fontSize: 10, fontWeight: '900', letterSpacing: 1.1, backgroundColor: Colors.primarySoft, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, overflow: 'hidden' },
-  activitySummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  stepRing: { width: 110, height: 110, alignItems: 'center', justifyContent: 'center' },
-  stepRingCenter: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  stepRingValue: { color: Colors.textPrimary, fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
-  stepRingLabel: { color: Colors.textMuted, fontSize: 8, fontWeight: '900', letterSpacing: 0.6, marginTop: 2 },
-  activityMetricStack: { flex: 1, gap: 4 },
-  activityMetric: { minHeight: 47, flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderSubtle },
-  activityMetricIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: Colors.primarySoft },
-  activityMetricHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 5 },
-  activityMetricLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: '800' },
-  activityMetricValue: { color: Colors.textPrimary, fontSize: 16, fontWeight: '900', marginTop: 1 },
-  activityMetricDetail: { color: Colors.textMuted, fontSize: 9, fontWeight: '700' },
+  dailyProgressCard: { backgroundColor: Colors.surface, borderRadius: 25, padding: 18, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 18, shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 3 },
+  dailyProgressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 11 },
+  dailyProgressTitle: { color: Colors.textPrimary, fontSize: 19, fontWeight: '900', letterSpacing: -0.35 },
+  activitySummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  activityMetricStack: { flex: 1, gap: 10, borderLeftWidth: 1, borderLeftColor: Colors.borderSubtle, paddingLeft: 14 },
+  activityMetric: { minHeight: 43, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  activityMetricIcon: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+  activityMetricCopy: { flex: 1, minWidth: 0 },
+  activityMetricLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700' },
+  activityMetricValue: { color: Colors.textPrimary, fontSize: 16, fontWeight: '900', lineHeight: 19 },
+  activityMetricSuffix: { color: Colors.textSecondary, fontSize: 11, fontWeight: '700' },
+  activityTrack: { height: 3, marginTop: 3, borderRadius: 2, backgroundColor: Colors.backgroundLight, overflow: 'hidden' },
+  activityTrackFill: { height: '100%', borderRadius: 2 },
   trainingPlanCard: { backgroundColor: Colors.surface, borderRadius: 22, padding: 17, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 16 },
-  integrationsCard: { backgroundColor: Colors.surface, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 16, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 2 },
-  integrationsHeading: { color: Colors.textPrimary, fontSize: 15, fontWeight: '900', marginBottom: 12 },
   trainingPlanHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   trainingPlanTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   trainingPlanIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primarySoft },
@@ -487,20 +436,12 @@ const createStyles = () => ({
   trainingRoadmapMilestone: { color: Colors.textSecondary, fontSize: 11, lineHeight: 17 },
   trainingStartButton: { minHeight: 43, borderRadius: 14, marginTop: 13, backgroundColor: Colors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
   trainingStartText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
-  stravaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  stravaTitle: { color: Colors.textPrimary, fontSize: 13, fontWeight: '900' },
-  stravaSubtitle: { color: Colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 3 },
-  stravaButton: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: Colors.borderSubtle, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 8 },
-  stravaButtonText: { color: Colors.primary, fontSize: 12, fontWeight: '900' },
-  stravaActivity: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderSubtle, paddingTop: 9, marginTop: 9 },
-  stravaActivityName: { color: Colors.textPrimary, fontSize: 12, fontWeight: '800' },
-  stravaActivityMeta: { color: Colors.textSecondary, fontSize: 11, marginTop: 2 },
   nutritionEngineCard: {
-    backgroundColor: '#0D1824',
+    backgroundColor: Colors.surface,
     borderRadius: 21,
     padding: 18,
     borderWidth: 1,
-    borderColor: '#203846',
+    borderColor: Colors.borderSubtle,
     marginBottom: 14,
   },
   nutritionEngineHeader: {
@@ -530,7 +471,7 @@ const createStyles = () => ({
     marginTop: 1,
   },
   nutritionPillBadge: {
-    backgroundColor: '#103B35',
+    backgroundColor: Colors.primarySoft,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 14,
@@ -576,18 +517,18 @@ const createStyles = () => ({
   communityCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D1824',
+    backgroundColor: Colors.surface,
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#203846',
+    borderColor: Colors.borderSubtle,
     marginBottom: 16,
   },
   communityIconWrap: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#103B35',
+    backgroundColor: Colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -651,18 +592,18 @@ const createStyles = () => ({
   activityItemCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D1824',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#203846',
+    borderColor: Colors.borderSubtle,
     marginBottom: 8,
   },
   activityItemIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#12202B',
+    backgroundColor: Colors.surfaceWarm,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -684,11 +625,11 @@ const createStyles = () => ({
   goalCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D1824',
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#203846',
+    borderColor: Colors.borderSubtle,
     marginBottom: 8,
   },
   goalIconBox: {
@@ -709,7 +650,7 @@ const createStyles = () => ({
     marginTop: 2,
   },
   statusProgressPill: {
-    backgroundColor: '#103B35',
+    backgroundColor: Colors.primarySoft,
     paddingVertical: 5,
     paddingHorizontal: 12,
     borderRadius: 12,
@@ -720,7 +661,7 @@ const createStyles = () => ({
     color: Colors.primary,
   },
   statusCompletedPill: {
-    backgroundColor: '#10362F',
+    backgroundColor: Colors.primarySoft,
     paddingVertical: 5,
     paddingHorizontal: 12,
     borderRadius: 12,

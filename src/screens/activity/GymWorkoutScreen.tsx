@@ -350,6 +350,7 @@ export default function GymWorkoutScreen({ navigation, route }: any) {
       return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi) || a.localeCompare(b);
     });
   }, [catalog, equipment, searchQuery]);
+  const activeMuscleGroup = groupedCatalog.find(([muscle]) => muscle === expandedMuscleGroup);
 
   const addExercise = async (exercise: StrengthExercise) => {
     if (selected.some((item) => item.exercise.id === exercise.id)) {
@@ -679,37 +680,32 @@ export default function GymWorkoutScreen({ navigation, route }: any) {
         </View>
         {!loadingCatalog && groupedCatalog.length === 0 ? <Text style={styles.helperText}>{catalog.length ? 'No exercises match your search.' : 'No exercises found for this equipment.'}</Text> : !loadingCatalog ? (
           <View style={styles.libraryCard}>
-            {groupedCatalog.map(([muscle, exercises], groupIndex) => (
-              <View key={muscle}>
-                {(() => {
-                  const isExpanded = expandedMuscleGroup === muscle || (Boolean(searchQuery.trim()) && expandedMuscleGroup === null && groupIndex === 0);
-                  return <>
-                    <TouchableOpacity style={styles.muscleGroupHeader} onPress={() => setExpandedMuscleGroup(isExpanded ? '' : muscle)} accessibilityRole="button" accessibilityState={{ expanded: isExpanded }} accessibilityLabel={`${muscle.replace(/_/g, ' ')}, ${exercises.length} exercises`}>
-                      <View style={styles.muscleGroupHeading}><Text style={styles.muscleGroupTitle}>{muscle.replace(/_/g, ' ')}</Text><Text style={styles.muscleGroupCount}>{exercises.length} {exercises.length === 1 ? 'exercise' : 'exercises'}</Text></View>
-                      <ChevronDown size={18} color={Colors.textSecondary} style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }} />
-                    </TouchableOpacity>
-                    {isExpanded && exercises.map((exercise, index) => {
-                  const alreadyAdded = selected.some((item) => item.exercise.id === exercise.id);
-                  const lastExercise = groupIndex === groupedCatalog.length - 1 && index === exercises.length - 1;
-                  const equipmentLabel = EQUIPMENT_OPTIONS.find((option) => option.id === exercise.equipment)?.label || exercise.equipment;
-                  return (
-                    <View key={exercise.id} style={[styles.libraryRow, lastExercise && { borderBottomWidth: 0 }]}>
-                      <View style={styles.exerciseIcon}><Dumbbell size={15} color={Colors.primary} /></View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.exerciseName}>{exercise.name}</Text>
-                        <Text style={styles.exerciseMeta}>{muscle.replace(/_/g, ' ')} · {equipmentLabel}</Text>
-                      </View>
-                      <TouchableOpacity style={styles.infoButton} onPress={() => void showExerciseDetails(exercise)} accessibilityRole="button" accessibilityLabel={`Details for ${exercise.name}`}><Info size={17} color={Colors.primary} /></TouchableOpacity>
-                      <TouchableOpacity style={[styles.addButton, alreadyAdded && styles.addButtonDisabled]} disabled={alreadyAdded} onPress={() => addExercise(exercise)} accessibilityRole="button" accessibilityLabel={`Add ${exercise.name}`}>
-                        {alreadyAdded ? <Check size={17} color={Colors.primary} /> : <Plus size={18} color="#FFFFFF" />}
-                      </TouchableOpacity>
-                    </View>
-                    );
-                    })}
-                  </>;
-                })()}
-              </View>
-            ))}
+            <Text style={styles.focusHeading}>Body focus area</Text>
+            <Text style={styles.focusSubheading}>Choose a muscle group to explore</Text>
+            <View style={styles.muscleGrid}>
+              {groupedCatalog.map(([muscle, exercises]) => {
+                const active = expandedMuscleGroup === muscle;
+                return <TouchableOpacity key={muscle} style={[styles.muscleTile, active && styles.muscleTileActive]} onPress={() => setExpandedMuscleGroup(active ? null : muscle)} accessibilityRole="button" accessibilityState={{ selected: active }}>
+                  <View style={[styles.muscleTileIcon, active && styles.muscleTileIconActive]}><Dumbbell size={17} color={active ? Colors.textLight : Colors.primary} /></View>
+                  <Text numberOfLines={1} style={[styles.muscleTileTitle, active && styles.muscleTileTitleActive]}>{muscle.replace(/_/g, ' ')}</Text>
+                  <Text style={[styles.muscleTileCount, active && styles.muscleTileTitleActive]}>{exercises.length} {exercises.length === 1 ? 'move' : 'moves'}</Text>
+                </TouchableOpacity>;
+              })}
+            </View>
+            {activeMuscleGroup ? <View style={styles.focusExercises}>
+              {activeMuscleGroup[1].map((exercise, index, exercises) => {
+                const alreadyAdded = selected.some((item) => item.exercise.id === exercise.id);
+                const equipmentLabel = EQUIPMENT_OPTIONS.find((option) => option.id === exercise.equipment)?.label || exercise.equipment;
+                return <View key={exercise.id} style={[styles.libraryRow, index === exercises.length - 1 && { borderBottomWidth: 0 }]}>
+                  <View style={styles.exerciseIcon}><Dumbbell size={15} color={Colors.primary} /></View>
+                  <View style={{ flex: 1 }}><Text style={styles.exerciseName}>{exercise.name}</Text><Text style={styles.exerciseMeta}>{expandedMuscleGroup.replace(/_/g, ' ')} · {equipmentLabel}</Text></View>
+                  <TouchableOpacity style={styles.infoButton} onPress={() => void showExerciseDetails(exercise)} accessibilityRole="button" accessibilityLabel={`Details for ${exercise.name}`}><Info size={17} color={Colors.primary} /></TouchableOpacity>
+                  <TouchableOpacity style={[styles.addButton, alreadyAdded && styles.addButtonDisabled]} disabled={alreadyAdded} onPress={() => addExercise(exercise)} accessibilityRole="button" accessibilityLabel={`Add ${exercise.name}`}>
+                    {alreadyAdded ? <Check size={17} color={Colors.primary} /> : <Plus size={18} color="#FFFFFF" />}
+                  </TouchableOpacity>
+                </View>;
+              })}
+            </View> : <View style={styles.focusEmpty}><Text style={styles.focusEmptyText}>Pick a focus area to see exercises for this equipment.</Text></View>}
           </View>
         ) : null}
 
@@ -845,6 +841,19 @@ const createStyles = () => ({
   instructionStep: { color: Colors.textSecondary, fontSize: 13, lineHeight: 20, marginBottom: 5 },
   detailsDoneButton: { minHeight: 44, alignItems: 'center' as const, justifyContent: 'center' as const, borderRadius: 13, backgroundColor: Colors.primary, marginTop: 8 },
   libraryCard: { backgroundColor: Colors.surface, borderRadius: 16, paddingHorizontal: 13, borderWidth: 1, borderColor: Colors.borderSubtle, marginBottom: 20 },
+  focusHeading: { color: Colors.textPrimary, fontSize: 16, fontWeight: '900' as const, marginTop: 15 },
+  focusSubheading: { color: Colors.textSecondary, fontSize: 11, marginTop: 3, marginBottom: 12 },
+  muscleGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: 9 },
+  muscleTile: { width: '48%' as const, minHeight: 92, borderRadius: 16, padding: 11, backgroundColor: Colors.backgroundLight, borderWidth: 1, borderColor: Colors.borderSubtle },
+  muscleTileActive: { backgroundColor: Colors.primarySoft, borderColor: Colors.primary },
+  muscleTileIcon: { width: 30, height: 30, borderRadius: 10, backgroundColor: Colors.surface, alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: 8 },
+  muscleTileIconActive: { backgroundColor: Colors.primary },
+  muscleTileTitle: { color: Colors.textPrimary, fontSize: 12, fontWeight: '900' as const, textTransform: 'capitalize' as const },
+  muscleTileTitleActive: { color: Colors.primary },
+  muscleTileCount: { color: Colors.textSecondary, fontSize: 10, fontWeight: '700' as const, marginTop: 3 },
+  focusExercises: { marginTop: 8, paddingHorizontal: 8, borderRadius: 15, backgroundColor: Colors.backgroundLight },
+  focusEmpty: { marginTop: 10, marginBottom: 2, padding: 13, borderRadius: 14, backgroundColor: Colors.backgroundLight },
+  focusEmptyText: { color: Colors.textSecondary, fontSize: 11, lineHeight: 16 },
   libraryRow: { minHeight: 59, flexDirection: 'row' as const, alignItems: 'center' as const, borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle },
   muscleGroupHeader: { minHeight: 50, flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle, paddingHorizontal: 5, marginTop: 5 },
   muscleGroupHeading: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 9 },

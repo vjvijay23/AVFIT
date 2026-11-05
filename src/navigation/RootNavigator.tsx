@@ -9,7 +9,7 @@ import {
   Home,
   Activity,
   Dumbbell,
-  ScanLine,
+  Camera,
   Utensils,
 } from 'lucide-react-native';
 
@@ -64,9 +64,9 @@ function MainTabs() {
           tabBarIcon: ({ focused }) => (
             <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
                 <Home
-                size={focused ? 21 : 19}
+                size={22}
                 color={focused ? Colors.primary : Colors.textMuted}
-                strokeWidth={focused ? 2.5 : 2}
+                strokeWidth={focused ? 2.5 : 2.2}
               />
             </View>
           ),
@@ -80,9 +80,9 @@ function MainTabs() {
           tabBarIcon: ({ focused }) => (
             <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
               <Activity
-                size={focused ? 21 : 19}
+                size={22}
                 color={focused ? Colors.primary : Colors.textMuted}
-                strokeWidth={focused ? 2.5 : 2}
+                strokeWidth={focused ? 2.5 : 2.2}
               />
             </View>
           ),
@@ -97,9 +97,9 @@ function MainTabs() {
           tabBarIcon: ({ focused }) => (
             <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
               <Dumbbell
-                size={focused ? 21 : 19}
+                size={22}
                 color={focused ? Colors.primary : Colors.textMuted}
-                strokeWidth={focused ? 2.5 : 2}
+                strokeWidth={focused ? 2.5 : 2.2}
               />
             </View>
           ),
@@ -112,10 +112,10 @@ function MainTabs() {
         options={{
           tabBarIcon: ({ focused }) => (
             <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
-              <ScanLine
-                size={focused ? 21 : 19}
+              <Camera
+                size={22}
                 color={focused ? Colors.primary : Colors.textMuted}
-                strokeWidth={focused ? 2.5 : 2}
+                strokeWidth={focused ? 2.5 : 2.2}
               />
             </View>
           ),
@@ -129,9 +129,9 @@ function MainTabs() {
           tabBarIcon: ({ focused }) => (
             <View style={[styles.tabIconBox, focused && styles.activeTabBadge]}>
               <Utensils
-                size={focused ? 21 : 19}
+                size={22}
                 color={focused ? Colors.primary : Colors.textMuted}
-                strokeWidth={focused ? 2.5 : 2}
+                strokeWidth={focused ? 2.5 : 2.2}
               />
             </View>
           ),
